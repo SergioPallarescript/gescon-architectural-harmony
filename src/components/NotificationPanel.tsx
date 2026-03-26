@@ -43,7 +43,7 @@ const NotificationPanel = ({ onClose }: { onClose: () => void }) => {
     fetch();
   }, []);
 
-  const handleNotificationClick = (notif: Notification) => {
+  const handleNotificationClick = (notif: NotificationItem) => {
     if (!notif.is_read) {
       setSelectedNotif(notif);
       setShowAckDialog(true);
