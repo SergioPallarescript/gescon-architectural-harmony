@@ -27,8 +27,8 @@ interface NotificationItem {
 
 const NotificationPanel = ({ onClose }: { onClose: () => void }) => {
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [selectedNotif, setSelectedNotif] = useState<NotificationItem | null>(null);
   const [showAckDialog, setShowAckDialog] = useState(false);
 
   useEffect(() => {
