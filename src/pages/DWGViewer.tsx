@@ -183,7 +183,7 @@ const DWGViewer = () => {
 
       const xViewer = await import("@x-viewer/core");
       const parser = new xViewer.DxfParser();
-      const dxfData = await parser.parseAsync(uint8);
+      const dxfData: any = await parser.parseAsync(uint8 as any);
 
       if (!dxfData || !dxfData.entities) throw new Error("No se pudieron extraer entidades del DWG");
 
