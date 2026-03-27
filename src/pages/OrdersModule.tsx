@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Plus, BookOpen, AlertTriangle, CheckCircle2, Clock, Mic, MicOff,
+  ArrowLeft, Plus, BookOpen, AlertTriangle, CheckCircle2, Clock, Mic, MicOff, Camera, Paperclip, X,
 } from "lucide-react";
 
 const CHANGE_KEYWORDS = ["modificar", "mover", "cambiar", "sustituir", "demoler", "ampliar", "reducir", "eliminar", "añadir", "reemplazar"];
