@@ -36,11 +36,11 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-const ROLES = ["DO", "DEO", "CSS", "CON", "PRO"] as const;
+const ROLES = ["DO", "DEM", "CSS", "CON", "PRO"] as const;
 
 const roleLabels: Record<string, string> = {
   DO: "Director de Obra",
-  DEO: "Director de Ejecución",
+  DEM: "Dir. Ejecución Material",
   CON: "Contratista",
   PRO: "Promotor",
   CSS: "Coord. Seguridad",
@@ -486,15 +486,16 @@ const PlansModule = () => {
                   <form onSubmit={handleUploadVersion} className="space-y-4 mt-4">
                     <div className="space-y-2">
                       <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">
-                        Archivo (PDF, DWG, DXF)
-                      </Label>
-                      <Input
-                        type="file"
-                        accept=".pdf,.dwg,.dxf,.png,.jpg"
-                        onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                        required
-                        className="cursor-pointer"
-                      />
+                      Archivo (PDF, DWG, DXF)
+                    </Label>
+                    <Input
+                      type="file"
+                      accept=".pdf,.dwg,.dxf,.png,.jpg"
+                      onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                      required
+                      className="cursor-pointer"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Solo DO y DEM pueden subir planos</p>
                     </div>
                     <div className="space-y-2">
                       <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">

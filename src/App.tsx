@@ -15,6 +15,7 @@ import DWGViewer from "./pages/DWGViewer";
 import CFOModule from "./pages/CFOModule";
 import BrainModule from "./pages/BrainModule";
 import ProjectDocs from "./pages/ProjectDocs";
+import GanttModule from "./pages/GanttModule";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -60,6 +61,7 @@ const App = () => (
             <Route path="/project/:id/cfo" element={<ProtectedRoute><CFOModule /></ProtectedRoute>} />
             <Route path="/project/:id/brain" element={<ProtectedRoute><BrainModule /></ProtectedRoute>} />
             <Route path="/project/:id/docs" element={<ProtectedRoute><ProjectDocs /></ProtectedRoute>} />
+            <Route path="/project/:id/gantt" element={<ProtectedRoute><GanttModule /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
