@@ -226,8 +226,7 @@ const OrdersModule = () => {
                   </div>
                   <Button type="submit" disabled={submitting} className="w-full font-display text-xs uppercase tracking-wider">
                     {submitting ? "Registrando..." : "Registrar Orden"}
-                  </Button>
-                  </Button>
+                   </Button>
                 </form>
               </DialogContent>
             </Dialog>
