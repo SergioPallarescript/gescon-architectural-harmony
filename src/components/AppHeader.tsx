@@ -35,8 +35,7 @@ const AppHeader = () => {
   }, []);
 
   const navItems = [
-    { label: "Panel Principal", icon: Home, path: "/" },
-    { label: "Proyectos", icon: FolderOpen, path: "/projects" },
+    { label: "Proyectos", icon: FolderOpen, path: "/" },
     { label: "Configuración", icon: Settings, path: "/settings" },
   ];
 
