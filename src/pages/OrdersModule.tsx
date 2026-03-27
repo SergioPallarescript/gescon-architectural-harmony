@@ -95,23 +95,33 @@ const OrdersModule = () => {
     e.preventDefault();
     if (!projectId || !user) return;
     setSubmitting(true);
+
+    // Upload photos/docs if any
+    const photoUrls: string[] = [];
+    for (const photo of photos) {
+      const path = `orders/${projectId}/${Date.now()}_${photo.name}`;
+      const { error } = await supabase.storage.from("plans").upload(path, photo);
+      if (!error) photoUrls.push(path);
+    }
+
     const flags = detectChanges(content);
     const requiresValidation = flags.length > 0;
     const { error } = await supabase.from("orders").insert({
       project_id: projectId, content, created_by: user.id,
       requires_validation: requiresValidation, ai_flags: { keywords: flags },
+      photos: photoUrls.length > 0 ? photoUrls : [],
     });
     if (error) { toast.error("Error al crear la orden"); setSubmitting(false); return; }
     await supabase.from("audit_logs").insert({
       user_id: user.id, project_id: projectId,
-      action: "order_created", details: { requires_validation: requiresValidation, ai_flags: flags },
+      action: "order_created", details: { requires_validation: requiresValidation, ai_flags: flags, has_photos: photoUrls.length > 0 },
     });
     if (requiresValidation) {
       toast.warning(`⚠️ Orden marcada para validación — palabras clave detectadas: ${flags.join(", ")}`);
     } else {
       toast.success("Orden registrada");
     }
-    setContent(""); setCreateOpen(false); setSubmitting(false); fetchOrders();
+    setContent(""); setPhotos([]); setCreateOpen(false); setSubmitting(false); fetchOrders();
   };
 
   const handleValidate = async (orderId: string) => {
