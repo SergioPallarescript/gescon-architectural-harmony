@@ -358,6 +358,9 @@ const PlansModule = () => {
 
   const userHasSigned = conformities.some((c) => c.user_id === user?.id);
 
+  // Get user's project-specific role (not profile global role)
+  const userProjectRole = members.find((m) => m.user_id === user?.id)?.role || profile?.role || "DO";
+
   // Get all expected roles from project members
   const expectedRoles = [...new Set(members.map((m) => m.role as string))];
   const signedRoles = [...new Set(conformities.map((c) => c.role))];
