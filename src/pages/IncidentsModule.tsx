@@ -223,13 +223,13 @@ const IncidentsModule = () => {
                       <Camera className="h-3.5 w-3.5" />
                       Fotografías
                     </Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(e) => setPhotos(Array.from(e.target.files || []))}
-                      className="cursor-pointer"
-                    />
+                    <input ref={photoInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { setPhotos(Array.from(e.target.files || [])); if (e.target) e.target.value = ""; }} />
+                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs w-full" onClick={() => photoInputRef.current?.click()}>
+                      <Camera className="h-3.5 w-3.5" /> Seleccionar fotos
+                    </Button>
+                    {photos.length > 0 && (
+                      <p className="text-xs text-muted-foreground">{photos.length} archivo(s) seleccionado(s)</p>
+                    )}
                   </div>
                   <Button type="submit" disabled={submitting} className="w-full font-display text-xs uppercase tracking-wider">
                     {submitting ? "Registrando..." : "Registrar Incidencia"}
