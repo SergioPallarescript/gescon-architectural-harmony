@@ -157,6 +157,8 @@ const GanttModule = () => {
 
   // Calculate Gantt chart dimensions
   const sortedItems = [...items].sort((a, b) => a.order - b.order);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const isCurrentMilestone = (item: GanttItem) => item.start <= todayStr && item.end >= todayStr;
   const allDates = items.flatMap((i) => [new Date(i.start), new Date(i.end)]);
   const minDate = allDates.length > 0 ? new Date(Math.min(...allDates.map((d) => d.getTime()))) : new Date();
   const maxDate = allDates.length > 0 ? new Date(Math.max(...allDates.map((d) => d.getTime()))) : new Date();
@@ -243,7 +245,7 @@ const GanttModule = () => {
                 </div>
                 <div className="divide-y divide-border">
                   {sortedItems.map((item, idx) => (
-                    <div key={item.id} className="flex items-center h-9">
+                    <div key={item.id} className={`flex items-center h-9 ${isCurrentMilestone(item) ? "ring-2 ring-green-500 bg-green-500/10" : ""}`}>
                       <div className="w-40 shrink-0 px-2 flex items-center border-r border-border">
                         <span className="text-[10px] truncate">{item.title}</span>
                       </div>
@@ -358,7 +360,7 @@ const GanttModule = () => {
                 </div>
                 <div className="divide-y divide-border">
                   {sortedItems.map((item, idx) => (
-                    <div key={item.id} className="flex items-center h-10 group">
+                    <div key={item.id} className={`flex items-center h-10 group ${isCurrentMilestone(item) ? "ring-2 ring-green-500 bg-green-500/10" : ""}`}>
                       <div className="w-48 md:w-64 shrink-0 px-3 flex items-center gap-1 border-r border-border">
                         {canEdit && (
                           <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">

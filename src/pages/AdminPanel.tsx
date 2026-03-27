@@ -52,11 +52,52 @@ const AdminPanel = () => {
 
   const fetchMembers = useCallback(async () => {
     if (!projectId) return;
-    const { data } = await supabase
+    
+    // Fetch invited/joined members
+    const { data: memberData } = await supabase
       .from("project_members")
       .select("*, profiles(full_name, email, role)")
       .eq("project_id", projectId);
-    setMembers(data || []);
+
+    // Fetch project creator (may not be in project_members)
+    const { data: project } = await supabase
+      .from("projects")
+      .select("created_by")
+      .eq("id", projectId)
+      .single();
+
+    let allMembers = memberData || [];
+
+    // If the creator is not already in project_members, add them as a virtual entry
+    if (project?.created_by) {
+      const creatorInMembers = allMembers.some((m: any) => m.user_id === project.created_by);
+      if (!creatorInMembers) {
+        const { data: creatorProfile } = await supabase
+          .from("profiles")
+          .select("full_name, email, role")
+          .eq("user_id", project.created_by)
+          .single();
+
+        if (creatorProfile) {
+          allMembers = [
+            {
+              id: `creator-${project.created_by}`,
+              project_id: projectId,
+              user_id: project.created_by,
+              role: creatorProfile.role || "DO",
+              secondary_role: null,
+              status: "accepted",
+              invited_email: creatorProfile.email,
+              profiles: creatorProfile,
+              _isCreator: true,
+            },
+            ...allMembers,
+          ];
+        }
+      }
+    }
+
+    setMembers(allMembers);
     setLoading(false);
   }, [projectId]);
 
