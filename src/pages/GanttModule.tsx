@@ -271,34 +271,39 @@ const GanttModule = () => {
       ) : (
         <>
           {/* Normal view with rotate button for mobile */}
-        <div className="flex items-center gap-3 mb-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/project/${projectId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">
-            Diagrama Gantt — Cronología de obra
-          </p>
-        </div>
+          <div className="flex items-center gap-3 mb-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/project/${projectId}`)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">
+              Diagrama Gantt — Cronología de obra
+            </p>
+          </div>
 
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <h1 className="font-display text-3xl font-bold tracking-tighter">Diagrama Gantt</h1>
-            <p className="text-sm text-muted-foreground mt-1">Cronología de obra personalizable</p>
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <h1 className="font-display text-3xl font-bold tracking-tighter">Diagrama Gantt</h1>
+              <p className="text-sm text-muted-foreground mt-1">Cronología de obra personalizable</p>
+            </div>
+            <div className="flex gap-2">
+              {isMobilePortrait && (
+                <Button onClick={() => setForcedLandscape(true)} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
+                  <RotateCcw className="h-4 w-4" /> Girar pantalla
+                </Button>
+              )}
+              {items.length === 0 && (
+                <Button onClick={generateFromDocs} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
+                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+                  {generating ? "Generando..." : "Generar desde documentos"}
+                </Button>
+              )}
+              {canEdit && (
+                <Button onClick={addItem} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
+                  <Plus className="h-4 w-4" /> Añadir Hito
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="flex gap-2">
-            {items.length === 0 && (
-              <Button onClick={generateFromDocs} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
-                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
-                {generating ? "Generando..." : "Generar desde documentos"}
-              </Button>
-            )}
-            {canEdit && (
-              <Button onClick={addItem} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
-                <Plus className="h-4 w-4" /> Añadir Hito
-              </Button>
-            )}
-          </div>
-        </div>
 
         {loading ? (
           <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-12 bg-card border border-border rounded-lg animate-pulse" />)}</div>
