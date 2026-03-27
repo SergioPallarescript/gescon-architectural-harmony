@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/useAuth";
 import AppLayout from "@/components/AppLayout";
 import AttachmentThumbnails from "@/components/AttachmentThumbnails";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -14,9 +13,13 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Plus, AlertTriangle, ShieldAlert, CheckCircle2, Mic, MicOff, Camera, Image, Paperclip,
+  ArrowLeft, Plus, ShieldAlert, CheckCircle2, Mic, MicOff, Camera, Image, Paperclip, Pencil, Trash2,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -46,11 +49,17 @@ const IncidentsModule = () => {
   const [submitting, setSubmitting] = useState(false);
   const [recording, setRecording] = useState(false);
 
+  const [editIncident, setEditIncident] = useState<any | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editSeverity, setEditSeverity] = useState("medium");
+  const [editRemedial, setEditRemedial] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [deleteIncidentId, setDeleteIncidentId] = useState<string | null>(null);
+
   const isCSS = profile?.role === "CSS";
   const [hasDualCSS, setHasDualCSS] = useState(false);
   const canWrite = isCSS || hasDualCSS;
 
-  // Check dual role
   useEffect(() => {
     if (!user || !projectId) return;
     supabase
@@ -81,71 +90,71 @@ const IncidentsModule = () => {
     e.preventDefault();
     if (!projectId || !user) return;
     setSubmitting(true);
-
-    // Upload photos if any
     const photoUrls: string[] = [];
     for (const photo of photos) {
       const path = `incidents/${projectId}/${Date.now()}_${photo.name}`;
       const { error } = await supabase.storage.from("plans").upload(path, photo);
       if (!error) photoUrls.push(path);
     }
-
     const { error } = await supabase.from("incidents").insert({
-      project_id: projectId,
-      content,
-      severity,
-      remedial_actions: remedial || null,
-      photos: photoUrls,
-      created_by: user.id,
+      project_id: projectId, content, severity,
+      remedial_actions: remedial || null, photos: photoUrls, created_by: user.id,
     });
-
-    if (error) {
-      toast.error("Error al registrar incidencia");
-      setSubmitting(false);
-      return;
-    }
-
+    if (error) { toast.error("Error al registrar incidencia"); setSubmitting(false); return; }
     await supabase.from("audit_logs").insert({
-      user_id: user.id,
-      project_id: projectId,
-      action: "incident_created",
-      details: { severity, has_photos: photoUrls.length > 0 },
+      user_id: user.id, project_id: projectId,
+      action: "incident_created", details: { severity, has_photos: photoUrls.length > 0 },
     });
-
     toast.success("Incidencia registrada");
-    setContent("");
-    setSeverity("medium");
-    setRemedial("");
-    setPhotos([]);
-    setCreateOpen(false);
-    setSubmitting(false);
-    fetchIncidents();
+    setContent(""); setSeverity("medium"); setRemedial(""); setPhotos([]);
+    setCreateOpen(false); setSubmitting(false); fetchIncidents();
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editIncident || !user) return;
+    setEditSubmitting(true);
+    const { error } = await supabase.from("incidents").update({
+      content: editContent, severity: editSeverity,
+      remedial_actions: editRemedial || null,
+    }).eq("id", editIncident.id);
+    if (error) { toast.error("Error al editar incidencia"); setEditSubmitting(false); return; }
+    await supabase.from("audit_logs").insert({
+      user_id: user.id, project_id: projectId!,
+      action: "incident_edited", details: { incident_id: editIncident.id },
+    });
+    toast.success("Incidencia actualizada");
+    setEditIncident(null); setEditSubmitting(false); fetchIncidents();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteIncidentId || !user) return;
+    const { error } = await supabase.from("incidents").delete().eq("id", deleteIncidentId);
+    if (error) { toast.error("Error al eliminar incidencia"); return; }
+    await supabase.from("audit_logs").insert({
+      user_id: user.id, project_id: projectId!,
+      action: "incident_deleted", details: { incident_id: deleteIncidentId },
+    });
+    toast.success("Incidencia eliminada");
+    setDeleteIncidentId(null); fetchIncidents();
   };
 
   const toggleRecording = () => {
     if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      toast.error("Tu navegador no soporta reconocimiento de voz");
-      return;
+      toast.error("Tu navegador no soporta reconocimiento de voz"); return;
     }
     if (recording) { setRecording(false); return; }
-
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    recognition.lang = "es-ES";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
+    recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
     recognition.onresult = (event: any) => {
       let transcript = "";
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
+      for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
       setContent(transcript);
     };
     recognition.onerror = () => { setRecording(false); toast.error("Error en reconocimiento de voz"); };
     recognition.onend = () => setRecording(false);
-    recognition.start();
-    setRecording(true);
+    recognition.start(); setRecording(true);
   };
 
   return (
@@ -155,30 +164,20 @@ const IncidentsModule = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(`/project/${projectId}`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">
-            Libro de Incidencias
-          </p>
+          <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">Libro de Incidencias</p>
         </div>
-
         <div className="flex items-end justify-between mb-8">
           <h1 className="font-display text-3xl font-bold tracking-tighter">Incidencias</h1>
           {canWrite && (
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="font-display text-xs uppercase tracking-wider gap-2">
-                  <Plus className="h-4 w-4" />
-                  Nueva Incidencia
-                </Button>
+                <Button className="font-display text-xs uppercase tracking-wider gap-2"><Plus className="h-4 w-4" />Nueva Incidencia</Button>
               </DialogTrigger>
               <DialogContent className="max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="font-display">Registrar Incidencia</DialogTitle>
-                </DialogHeader>
+                <DialogHeader><DialogTitle className="font-display">Registrar Incidencia</DialogTitle></DialogHeader>
                 <form onSubmit={handleCreate} className="space-y-4 mt-4">
                   <div className="space-y-2">
-                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">
-                      Gravedad
-                    </Label>
+                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Gravedad</Label>
                     <Select value={severity} onValueChange={setSeverity}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -190,43 +189,21 @@ const IncidentsModule = () => {
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">
-                        Descripción del Riesgo
-                      </Label>
-                      <Button
-                        type="button"
-                        variant={recording ? "destructive" : "outline"}
-                        size="sm"
-                        onClick={toggleRecording}
-                        className="gap-1 text-xs"
-                      >
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Descripción del Riesgo</Label>
+                      <Button type="button" variant={recording ? "destructive" : "outline"} size="sm" onClick={toggleRecording} className="gap-1 text-xs">
                         {recording ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
                         {recording ? "Parar" : "Dictar"}
                       </Button>
                     </div>
-                    <Textarea
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                      placeholder="Describa la incidencia de seguridad..."
-                      rows={5}
-                      required
-                    />
+                    <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Describa la incidencia de seguridad..." rows={5} required />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">
-                      Acciones Correctoras
-                    </Label>
-                    <Textarea
-                      value={remedial}
-                      onChange={(e) => setRemedial(e.target.value)}
-                      placeholder="Medidas correctoras propuestas..."
-                      rows={3}
-                    />
+                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Acciones Correctoras</Label>
+                    <Textarea value={remedial} onChange={(e) => setRemedial(e.target.value)} placeholder="Medidas correctoras propuestas..." rows={3} />
                   </div>
                   <div className="space-y-2">
                     <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                      <Camera className="h-3.5 w-3.5" />
-                      Fotografías
+                      <Camera className="h-3.5 w-3.5" /> Fotografías
                     </Label>
                     <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); if (e.target) e.target.value = ""; }} />
                     <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); if (e.target) e.target.value = ""; }} />
@@ -283,27 +260,20 @@ const IncidentsModule = () => {
           <div className="space-y-3">
             {incidents.map((inc, i) => {
               const sev = severityLabels[inc.severity] || severityLabels.medium;
+              const isOwner = inc.created_by === user?.id;
               return (
                 <div
                   key={inc.id}
-                  className={`bg-card border border-border rounded-lg p-5 animate-fade-in ${
-                    inc.status === "resolved" ? "opacity-60" : ""
-                  }`}
+                  className={`bg-card border border-border rounded-lg p-5 animate-fade-in ${inc.status === "resolved" ? "opacity-60" : ""}`}
                   style={{ animationDelay: `${i * 60}ms` }}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-display font-bold text-muted-foreground">
-                          #{inc.incident_number}
-                        </span>
-                        <span className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-widest rounded ${sev.color}`}>
-                          {sev.label}
-                        </span>
+                        <span className="text-xs font-display font-bold text-muted-foreground">#{inc.incident_number}</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-widest rounded ${sev.color}`}>{sev.label}</span>
                         {inc.status === "resolved" && (
-                          <span className="flex items-center gap-1 text-xs text-success">
-                            <CheckCircle2 className="h-3 w-3" /> Resuelta
-                          </span>
+                          <span className="flex items-center gap-1 text-xs text-success"><CheckCircle2 className="h-3 w-3" /> Resuelta</span>
                         )}
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{inc.content}</p>
@@ -321,6 +291,16 @@ const IncidentsModule = () => {
                         })}
                       </p>
                     </div>
+                    {isOwner && (
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <Button size="sm" variant="ghost" onClick={() => { setEditIncident(inc); setEditContent(inc.content); setEditSeverity(inc.severity); setEditRemedial(inc.remedial_actions || ""); }} className="gap-1 text-xs text-muted-foreground">
+                          <Pencil className="h-3.5 w-3.5" /> Editar
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setDeleteIncidentId(inc.id)} className="gap-1 text-xs text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -328,6 +308,51 @@ const IncidentsModule = () => {
           </div>
         )}
       </div>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editIncident} onOpenChange={(open) => { if (!open) setEditIncident(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-display">Editar Incidencia</DialogTitle></DialogHeader>
+          <form onSubmit={handleEdit} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Gravedad</Label>
+              <Select value={editSeverity} onValueChange={setEditSeverity}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(severityLabels).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Descripción del Riesgo</Label>
+              <Textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={5} required />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Acciones Correctoras</Label>
+              <Textarea value={editRemedial} onChange={(e) => setEditRemedial(e.target.value)} rows={3} />
+            </div>
+            <Button type="submit" disabled={editSubmitting} className="w-full font-display text-xs uppercase tracking-wider">
+              {editSubmitting ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteIncidentId} onOpenChange={() => setDeleteIncidentId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display">Eliminar Incidencia</AlertDialogTitle>
+            <AlertDialogDescription>¿Estás seguro? Esta acción no se puede deshacer. La eliminación quedará registrada en el historial.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };

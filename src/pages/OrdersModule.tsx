@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Plus, BookOpen, AlertTriangle, CheckCircle2, Clock, Mic, MicOff, Camera, Image, Paperclip, X,
+  ArrowLeft, Plus, BookOpen, AlertTriangle, CheckCircle2, Mic, MicOff, Camera, Image, Paperclip, X, Pencil, Trash2,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -36,10 +36,13 @@ const OrdersModule = () => {
   const [recording, setRecording] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
   const [confirmValidate, setConfirmValidate] = useState<string | null>(null);
+  const [editOrder, setEditOrder] = useState<any | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
 
   const isDEM = profile?.role === "DEM";
   const isDO = profile?.role === "DO";
-  // Dual role: check if user has secondary_role CSS via project_members
   const [hasDualCSS, setHasDualCSS] = useState(false);
   const canWrite = isDEM || isDO || hasDualCSS;
   const canValidate = profile?.role === "CON" || profile?.role === "PRO";
@@ -48,7 +51,6 @@ const OrdersModule = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
 
-  // Check dual role
   useEffect(() => {
     if (!user || !projectId) return;
     supabase
@@ -101,15 +103,12 @@ const OrdersModule = () => {
     e.preventDefault();
     if (!projectId || !user) return;
     setSubmitting(true);
-
-    // Upload photos/docs if any
     const photoUrls: string[] = [];
     for (const photo of photos) {
       const path = `orders/${projectId}/${Date.now()}_${photo.name}`;
       const { error } = await supabase.storage.from("plans").upload(path, photo);
       if (!error) photoUrls.push(path);
     }
-
     const flags = detectChanges(content);
     const requiresValidation = flags.length > 0;
     const { error } = await supabase.from("orders").insert({
@@ -128,6 +127,38 @@ const OrdersModule = () => {
       toast.success("Orden registrada");
     }
     setContent(""); setPhotos([]); setCreateOpen(false); setSubmitting(false); fetchOrders();
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editOrder || !user) return;
+    setEditSubmitting(true);
+    const flags = detectChanges(editContent);
+    const requiresValidation = flags.length > 0;
+    const { error } = await supabase.from("orders").update({
+      content: editContent,
+      requires_validation: requiresValidation,
+      ai_flags: { keywords: flags },
+    }).eq("id", editOrder.id);
+    if (error) { toast.error("Error al editar la orden"); setEditSubmitting(false); return; }
+    await supabase.from("audit_logs").insert({
+      user_id: user.id, project_id: projectId!,
+      action: "order_edited", details: { order_id: editOrder.id },
+    });
+    toast.success("Orden actualizada");
+    setEditOrder(null); setEditContent(""); setEditSubmitting(false); fetchOrders();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteOrderId || !user) return;
+    const { error } = await supabase.from("orders").delete().eq("id", deleteOrderId);
+    if (error) { toast.error("Error al eliminar la orden"); return; }
+    await supabase.from("audit_logs").insert({
+      user_id: user.id, project_id: projectId!,
+      action: "order_deleted", details: { order_id: deleteOrderId },
+    });
+    toast.success("Orden eliminada");
+    setDeleteOrderId(null); fetchOrders();
   };
 
   const handleValidate = async (orderId: string) => {
@@ -249,7 +280,7 @@ const OrdersModule = () => {
                   </div>
                   <Button type="submit" disabled={submitting} className="w-full font-display text-xs uppercase tracking-wider">
                     {submitting ? "Registrando..." : "Registrar Orden"}
-                   </Button>
+                  </Button>
                 </form>
               </DialogContent>
             </Dialog>
@@ -268,6 +299,7 @@ const OrdersModule = () => {
             {orders.map((order, i) => {
               const orderVals = validations[order.id] || [];
               const userValidated = orderVals.some((v: any) => v.user_id === user?.id);
+              const isOwner = order.created_by === user?.id;
               return (
                 <div key={order.id} className={`bg-card border rounded-lg p-5 animate-fade-in ${order.requires_validation ? "border-warning/40" : "border-border"}`} style={{ animationDelay: `${i * 60}ms` }}>
                   <div className="flex items-start justify-between gap-4">
@@ -293,11 +325,23 @@ const OrdersModule = () => {
                         </div>
                       )}
                     </div>
-                    {order.requires_validation && canValidate && !userValidated && (
-                      <Button size="sm" variant="outline" onClick={() => setConfirmValidate(order.id)} className="font-display text-xs uppercase tracking-wider gap-1 shrink-0">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Validar
-                      </Button>
-                    )}
+                    <div className="flex flex-col gap-1 shrink-0">
+                      {order.requires_validation && canValidate && !userValidated && (
+                        <Button size="sm" variant="outline" onClick={() => setConfirmValidate(order.id)} className="font-display text-xs uppercase tracking-wider gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Validar
+                        </Button>
+                      )}
+                      {isOwner && (
+                        <>
+                          <Button size="sm" variant="ghost" onClick={() => { setEditOrder(order); setEditContent(order.content); }} className="gap-1 text-xs text-muted-foreground">
+                            <Pencil className="h-3.5 w-3.5" /> Editar
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setDeleteOrderId(order.id)} className="gap-1 text-xs text-destructive">
+                            <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -306,6 +350,29 @@ const OrdersModule = () => {
         )}
       </div>
 
+      {/* Edit dialog */}
+      <Dialog open={!!editOrder} onOpenChange={(open) => { if (!open) setEditOrder(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="font-display">Editar Orden</DialogTitle></DialogHeader>
+          <form onSubmit={handleEdit} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Contenido</Label>
+              <Textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={6} required />
+              {editContent && detectChanges(editContent).length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 px-3 py-2 rounded">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Palabras clave detectadas: {detectChanges(editContent).join(", ")}.
+                </div>
+              )}
+            </div>
+            <Button type="submit" disabled={editSubmitting} className="w-full font-display text-xs uppercase tracking-wider">
+              {editSubmitting ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Validate confirm */}
       <AlertDialog open={!!confirmValidate} onOpenChange={() => setConfirmValidate(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -315,6 +382,20 @@ const OrdersModule = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => confirmValidate && handleValidate(confirmValidate)}>Validar Orden</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteOrderId} onOpenChange={() => setDeleteOrderId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display">Eliminar Orden</AlertDialogTitle>
+            <AlertDialogDescription>¿Estás seguro? Esta acción no se puede deshacer. La eliminación quedará registrada en el historial.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
