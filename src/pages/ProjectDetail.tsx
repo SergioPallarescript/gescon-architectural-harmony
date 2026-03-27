@@ -71,6 +71,7 @@ const ProjectDetail = () => {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<AppRole>("CON");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState<{ email: string; role: AppRole } | null>(null);
   const isCreator = project?.created_by === user?.id;
 
   useEffect(() => {
