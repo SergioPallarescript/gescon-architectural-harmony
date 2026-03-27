@@ -172,88 +172,64 @@ const DWGViewer = () => {
     }
   }, [renderPdfPage]);
 
-  /* ─── DWG rendering via @x-viewer/core ─── */
+  /* ─── DWG rendering via @x-viewer/core Viewer2d ─── */
+  const dwgContainerRef = useRef<HTMLDivElement>(null);
+  const dwgViewerRef = useRef<any>(null);
+
   const loadDwg = useCallback(async (fileRecord: any) => {
     setFileLoading(true);
     try {
       const { data: blob } = await supabase.storage.from("plans").download(fileRecord.file_url);
       if (!blob) throw new Error("No se pudo descargar");
-      const arrayBuf = await blob.arrayBuffer();
+      const url = URL.createObjectURL(blob);
+
+      // Create a temporary container for the viewer
+      const container = dwgContainerRef.current;
+      if (!container) throw new Error("Container no disponible");
+      container.style.width = "2000px";
+      container.style.height = "1400px";
+      container.innerHTML = "";
+
+      const viewerDiv = document.createElement("div");
+      viewerDiv.id = "dwg-viewer-" + Date.now();
+      viewerDiv.style.width = "100%";
+      viewerDiv.style.height = "100%";
+      container.appendChild(viewerDiv);
 
       const xViewer = await import("@x-viewer/core");
-      const viewer = new xViewer.DWGViewer();
-      const result = await viewer.load(new Uint8Array(arrayBuf));
-
-      const canvas = pdfCanvasRef.current;
-      if (!canvas) throw new Error("Canvas no disponible");
-
-      /* Compute bounding box of all entities */
-      const entities = result.entities || [];
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-      const processPoints = (pts: any[]) => {
-        for (const p of pts) {
-          if (p.x !== undefined && p.y !== undefined) {
-            minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
-            maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
-          }
-        }
-      };
-
-      for (const e of entities) {
-        if (e.vertices) processPoints(e.vertices);
-        if (e.startPoint) processPoints([e.startPoint]);
-        if (e.endPoint) processPoints([e.endPoint]);
-        if (e.center) processPoints([e.center]);
-      }
-
-      if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 1000; maxY = 700; }
-
-      const padding = 40;
-      const drawW = maxX - minX || 1;
-      const drawH = maxY - minY || 1;
-      const cw = 2000;
-      const ch = Math.round(cw * (drawH / drawW));
-      canvas.width = cw;
-      canvas.height = ch;
-
-      const scale = Math.min((cw - padding * 2) / drawW, (ch - padding * 2) / drawH);
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("No 2d context");
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, cw, ch);
-
-      const toCanvas = (x: number, y: number) => ({
-        cx: padding + (x - minX) * scale,
-        cy: ch - padding - (y - minY) * scale, // flip Y
+      const viewer = new xViewer.Viewer2d({
+        containerId: viewerDiv.id,
+        enableSpinner: false,
+        enableProgressBar: false,
       });
+      dwgViewerRef.current = viewer;
 
-      ctx.strokeStyle = "#1a1a1a";
-      ctx.lineWidth = 1;
+      const model = await xViewer.DxfLoader.load(url, viewer);
+      viewer.addModel(model);
+      viewer.viewFitAll();
+      viewer.enableRender(0);
 
-      for (const e of entities) {
-        ctx.beginPath();
-        if (e.type === "LINE" && e.startPoint && e.endPoint) {
-          const a = toCanvas(e.startPoint.x, e.startPoint.y);
-          const b = toCanvas(e.endPoint.x, e.endPoint.y);
-          ctx.moveTo(a.cx, a.cy); ctx.lineTo(b.cx, b.cy);
-        } else if ((e.type === "LWPOLYLINE" || e.type === "POLYLINE") && e.vertices) {
-          const pts = e.vertices.map((v: any) => toCanvas(v.x, v.y));
-          if (pts.length > 0) {
-            ctx.moveTo(pts[0].cx, pts[0].cy);
-            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].cx, pts[i].cy);
-            if (e.isClosed) ctx.closePath();
+      // Wait for render, then capture to our canvas
+      await new Promise(r => setTimeout(r, 1500));
+
+      const webglCanvas = viewerDiv.querySelector("canvas");
+      if (webglCanvas) {
+        const canvas = pdfCanvasRef.current;
+        if (canvas) {
+          canvas.width = webglCanvas.width;
+          canvas.height = webglCanvas.height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(webglCanvas, 0, 0);
           }
-        } else if (e.type === "CIRCLE" && e.center && e.radius) {
-          const c = toCanvas(e.center.x, e.center.y);
-          ctx.arc(c.cx, c.cy, e.radius * scale, 0, Math.PI * 2);
-        } else if (e.type === "ARC" && e.center && e.radius) {
-          const c = toCanvas(e.center.x, e.center.y);
-          ctx.arc(c.cx, c.cy, e.radius * scale, -(e.endAngle || 0), -(e.startAngle || 0), true);
         }
-        ctx.stroke();
       }
+
+      URL.revokeObjectURL(url);
+      // Clean up viewer DOM but keep canvas snapshot
+      container.innerHTML = "";
 
       setRenderedType("dwg");
       setTotalPages(0);
