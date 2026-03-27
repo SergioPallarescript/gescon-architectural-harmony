@@ -37,22 +37,57 @@ const GanttModule = () => {
   const [forcedLandscape, setForcedLandscape] = useState(false);
 
   const canEdit = profile?.role === "DEM" || profile?.role === "DO" || profile?.role === "CON";
+  const canRegenerate = profile?.role === "DEM" || profile?.role === "DO";
 
-  // Load from localStorage per project
-  const storageKey = `gantt_${projectId}`;
-
+  // Load milestones from database
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try { setItems(JSON.parse(saved)); } catch { /* ignore */ }
-    }
-    setLoading(false);
-  }, [storageKey]);
+    if (!projectId) return;
+    const loadMilestones = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("gantt_milestones")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("sort_order", { ascending: true });
 
-  const saveItems = useCallback((newItems: GanttItem[]) => {
+      if (!error && data && data.length > 0) {
+        setItems(data.map((d: any) => ({
+          id: d.id,
+          title: d.title,
+          start: d.start_date,
+          end: d.end_date,
+          order: d.sort_order,
+        })));
+      }
+      setLoading(false);
+    };
+    loadMilestones();
+  }, [projectId]);
+
+  // Save items to database
+  const saveItems = useCallback(async (newItems: GanttItem[]) => {
     setItems(newItems);
-    localStorage.setItem(storageKey, JSON.stringify(newItems));
-  }, [storageKey]);
+    if (!projectId) return;
+
+    // Delete all existing milestones for this project, then insert new ones
+    await supabase.from("gantt_milestones").delete().eq("project_id", projectId);
+
+    if (newItems.length > 0) {
+      const rows = newItems.map((item) => ({
+        id: item.id,
+        project_id: projectId,
+        title: item.title,
+        start_date: item.start,
+        end_date: item.end,
+        sort_order: item.order,
+      }));
+      const { error } = await supabase.from("gantt_milestones").insert(rows);
+      if (error) {
+        console.error("Error saving milestones:", error);
+        toast.error("Error al guardar los hitos");
+      }
+    }
+  }, [projectId]);
 
   // Auto-generate from project documents
   const generateFromDocs = async () => {
@@ -60,28 +95,9 @@ const GanttModule = () => {
     setGenerating(true);
 
     try {
-      const { data: docs } = await supabase
-        .from("project_documents")
-        .select("file_name, created_at")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: true });
-
-      const { data: plans } = await supabase
-        .from("plans")
-        .select("name, category, created_at")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: true });
-
-      const { data: orders } = await supabase
-        .from("orders")
-        .select("content, created_at, order_number")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: true });
-
       const milestones: GanttItem[] = [];
       let order = 0;
 
-      // Default construction phases
       const defaultPhases = [
         "Demoliciones y movimiento de tierras",
         "Cimentación",
@@ -110,9 +126,7 @@ const GanttModule = () => {
         });
       });
 
-      // Documents and plans are used to inform the timeline but NOT shown as milestones
-
-      saveItems(milestones);
+      await saveItems(milestones);
       toast.success(`Diagrama generado con ${milestones.length} hitos`);
     } catch {
       toast.error("Error al generar el diagrama");
@@ -216,10 +230,12 @@ const GanttModule = () => {
           <div className="flex items-end justify-between mb-4">
             <h1 className="font-display text-2xl font-bold tracking-tighter">Diagrama Gantt</h1>
             <div className="flex gap-2">
-              <Button onClick={generateFromDocs} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
-                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
-                {generating ? "Generando..." : items.length === 0 ? "Generar" : "Regenerar"}
-              </Button>
+              {canRegenerate && (
+                <Button onClick={generateFromDocs} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
+                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+                  {generating ? "Generando..." : items.length === 0 ? "Generar" : "Regenerar"}
+                </Button>
+              )}
               {canEdit && (
                 <Button onClick={addItem} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
                   <Plus className="h-4 w-4" /> Añadir
@@ -328,10 +344,12 @@ const GanttModule = () => {
                   <RotateCcw className="h-4 w-4" /> Girar pantalla
                 </Button>
               )}
-              <Button onClick={generateFromDocs} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
-                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
-                {generating ? "Generando..." : items.length === 0 ? "Generar desde documentos" : "Regenerar"}
-              </Button>
+              {canRegenerate && (
+                <Button onClick={generateFromDocs} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
+                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+                  {generating ? "Generando..." : items.length === 0 ? "Generar desde documentos" : "Regenerar"}
+                </Button>
+              )}
               {canEdit && (
                 <Button onClick={addItem} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
                   <Plus className="h-4 w-4" /> Añadir Hito
@@ -346,7 +364,11 @@ const GanttModule = () => {
             <div className="text-center py-20">
               <BarChart3 className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
               <p className="font-display text-muted-foreground">No hay hitos definidos</p>
-              <p className="text-xs text-muted-foreground mt-2">Genera automáticamente desde los documentos del proyecto o añade hitos manualmente.</p>
+              {canRegenerate ? (
+                <p className="text-xs text-muted-foreground mt-2">Genera automáticamente desde los documentos del proyecto o añade hitos manualmente.</p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-2">El Director de Obra o el Director de Ejecución Material debe generar el diagrama.</p>
+              )}
             </div>
           ) : (
             <>
