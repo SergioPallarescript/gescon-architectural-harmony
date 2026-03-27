@@ -325,7 +325,7 @@ const PlansModule = () => {
       details: {
         plan_name: selectedPlan?.name,
         version: latestVersion.version_number,
-        role: profile.role,
+        role: memberRole,
         geo_location: geoString,
       },
     });
