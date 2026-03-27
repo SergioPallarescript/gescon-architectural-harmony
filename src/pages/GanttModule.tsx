@@ -34,22 +34,7 @@ const GanttModule = () => {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [isPortrait, setIsPortrait] = useState(false);
-
-  // Detect portrait on mobile
-  useEffect(() => {
-    const checkOrientation = () => {
-      const isMobile = window.innerWidth < 768 || window.innerHeight < 768;
-      setIsPortrait(isMobile && window.innerHeight > window.innerWidth);
-    };
-    checkOrientation();
-    window.addEventListener("resize", checkOrientation);
-    window.addEventListener("orientationchange", () => setTimeout(checkOrientation, 100));
-    return () => {
-      window.removeEventListener("resize", checkOrientation);
-      window.removeEventListener("orientationchange", checkOrientation);
-    };
-  }, []);
+  const [forcedLandscape, setForcedLandscape] = useState(false);
 
   const canEdit = profile?.role === "DEM" || profile?.role === "DO" || profile?.role === "CON";
 
@@ -201,156 +186,223 @@ const GanttModule = () => {
     cursor.setMonth(cursor.getMonth() + 1);
   }
 
+  const isMobilePortrait = typeof window !== 'undefined' && window.innerWidth < 768 && window.innerHeight > window.innerWidth;
+
   return (
     <AppLayout>
-      {/* Portrait lock overlay */}
-      {isPortrait && (
-        <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center gap-4 px-8 text-center">
-          <RotateCcw className="h-16 w-16 text-muted-foreground animate-pulse" />
-          <h2 className="font-display text-xl font-bold tracking-tighter">Gira tu dispositivo</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            El diagrama Gantt necesita orientación horizontal para una correcta visualización y edición.
-          </p>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/project/${projectId}`)}>
-            <ArrowLeft className="h-4 w-4 mr-2" /> Volver al proyecto
-          </Button>
-        </div>
-      )}
-      <div className="max-w-full mx-auto px-4 py-8">
-        <div className="flex items-center gap-3 mb-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/project/${projectId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">
-            Diagrama Gantt — Cronología de obra
-          </p>
-        </div>
-
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <h1 className="font-display text-3xl font-bold tracking-tighter">Diagrama Gantt</h1>
-            <p className="text-sm text-muted-foreground mt-1">Cronología de obra personalizable</p>
-          </div>
-          <div className="flex gap-2">
-            {items.length === 0 && (
-              <Button onClick={generateFromDocs} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
-                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
-                {generating ? "Generando..." : "Generar desde documentos"}
+      {/* Forced landscape wrapper */}
+      {forcedLandscape ? (
+        <div
+          className="fixed inset-0 z-[100] bg-background overflow-auto"
+          style={{
+            transform: "rotate(90deg)",
+            transformOrigin: "top left",
+            width: `${window.innerHeight}px`,
+            height: `${window.innerWidth}px`,
+            top: 0,
+            left: `${window.innerWidth}px`,
+          }}
+        >
+          <div className="p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <Button variant="ghost" size="icon" onClick={() => setForcedLandscape(false)}>
+                <RotateCcw className="h-4 w-4" />
               </Button>
-            )}
-            {canEdit && (
-              <Button onClick={addItem} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
-                <Plus className="h-4 w-4" /> Añadir Hito
-              </Button>
-            )}
-          </div>
-        </div>
+              <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">
+                Diagrama Gantt — Cronología de obra
+              </p>
+            </div>
 
-        {loading ? (
-          <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-12 bg-card border border-border rounded-lg animate-pulse" />)}</div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-20">
-            <BarChart3 className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
-            <p className="font-display text-muted-foreground">No hay hitos definidos</p>
-            <p className="text-xs text-muted-foreground mt-2">Genera automáticamente desde los documentos del proyecto o añade hitos manualmente.</p>
-          </div>
-        ) : (
-          <>
-            {/* Gantt Chart */}
-            <div className="bg-card border border-border rounded-lg overflow-hidden mb-6">
-              {/* Month headers */}
-              <div className="relative h-8 border-b border-border bg-secondary/30 overflow-hidden">
-                {months.map((m, i) => (
-                  <span key={i} className="absolute top-1.5 text-[10px] font-display uppercase tracking-wider text-muted-foreground" style={{ left: m.left }}>
-                    {m.label}
-                  </span>
-                ))}
-              </div>
-
-              {/* Bars */}
-              <div className="divide-y divide-border">
-                {sortedItems.map((item, idx) => (
-                  <div key={item.id} className="flex items-center h-10 group">
-                    {/* Label */}
-                    <div className="w-48 md:w-64 shrink-0 px-3 flex items-center gap-1 border-r border-border">
-                      {canEdit && (
-                        <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => moveItem(item.id, -1)} className="text-muted-foreground hover:text-foreground text-[8px] leading-none">▲</button>
-                          <button onClick={() => moveItem(item.id, 1)} className="text-muted-foreground hover:text-foreground text-[8px] leading-none">▼</button>
-                        </div>
-                      )}
-                      {editingId === item.id ? (
-                        <Input
-                          value={item.title}
-                          onChange={(e) => updateItem(item.id, { title: e.target.value })}
-                          onBlur={() => setEditingId(null)}
-                          onKeyDown={(e) => e.key === "Enter" && setEditingId(null)}
-                          className="h-7 text-xs"
-                          autoFocus
-                        />
-                      ) : (
-                        <button
-                          onClick={() => canEdit && setEditingId(item.id)}
-                          className="text-xs truncate text-left flex-1 hover:text-foreground transition-colors"
-                        >
-                          {item.title}
-                        </button>
-                      )}
-                    </div>
-                    {/* Bar */}
-                    <div className="flex-1 relative h-full px-1">
-                      <div
-                        className="absolute top-2 h-6 rounded"
-                        style={{
-                          ...getBarStyle(item),
-                          backgroundColor: COLORS[idx % COLORS.length],
-                          opacity: 0.8,
-                          minWidth: "4px",
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
+            <div className="flex items-end justify-between mb-4">
+              <h1 className="font-display text-2xl font-bold tracking-tighter">Diagrama Gantt</h1>
+              <div className="flex gap-2">
+                {items.length === 0 && (
+                  <Button onClick={generateFromDocs} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
+                    {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+                    {generating ? "Generando..." : "Generar"}
+                  </Button>
+                )}
+                {canEdit && (
+                  <Button onClick={addItem} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
+                    <Plus className="h-4 w-4" /> Añadir
+                  </Button>
+                )}
               </div>
             </div>
 
-            {/* Editable list */}
-            {canEdit && (
-              <>
-                <h2 className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">Editar hitos</h2>
-                <div className="space-y-2">
-                  {sortedItems.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2 bg-card border border-border rounded-lg p-3">
-                      <GripVertical className="h-4 w-4 text-muted-foreground/30 shrink-0" />
-                      <Input
-                        value={item.title}
-                        onChange={(e) => updateItem(item.id, { title: e.target.value })}
-                        className="flex-1 h-8 text-xs text-foreground"
-                      />
-                      <Input
-                        type="date"
-                        value={item.start}
-                        onChange={(e) => updateItem(item.id, { start: e.target.value })}
-                        className="w-40 h-8 text-xs text-foreground"
-                      />
-                      <span className="text-xs text-muted-foreground">→</span>
-                      <Input
-                        type="date"
-                        value={item.end}
-                        onChange={(e) => updateItem(item.id, { end: e.target.value })}
-                        className="w-40 h-8 text-xs text-foreground"
-                      />
-                      <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id)} className="text-destructive/60 hover:text-destructive shrink-0 h-8 w-8">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+            {items.length === 0 ? (
+              <div className="text-center py-10">
+                <BarChart3 className="h-12 w-12 text-muted-foreground/20 mx-auto mb-3" />
+                <p className="font-display text-muted-foreground text-sm">No hay hitos definidos</p>
+              </div>
+            ) : (
+              <div className="bg-card border border-border rounded-lg overflow-hidden">
+                <div className="relative h-7 border-b border-border bg-secondary/30 overflow-hidden">
+                  {months.map((m, i) => (
+                    <span key={i} className="absolute top-1 text-[9px] font-display uppercase tracking-wider text-muted-foreground" style={{ left: m.left }}>
+                      {m.label}
+                    </span>
+                  ))}
+                </div>
+                <div className="divide-y divide-border">
+                  {sortedItems.map((item, idx) => (
+                    <div key={item.id} className="flex items-center h-9">
+                      <div className="w-40 shrink-0 px-2 flex items-center border-r border-border">
+                        <span className="text-[10px] truncate">{item.title}</span>
+                      </div>
+                      <div className="flex-1 relative h-full px-1">
+                        <div
+                          className="absolute top-1.5 h-5 rounded"
+                          style={{
+                            ...getBarStyle(item),
+                            backgroundColor: COLORS[idx % COLORS.length],
+                            opacity: 0.8,
+                            minWidth: "4px",
+                          }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
-              </>
+              </div>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-full mx-auto px-4 py-8">
+          <div className="flex items-center gap-3 mb-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/project/${projectId}`)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">
+              Diagrama Gantt — Cronología de obra
+            </p>
+          </div>
+
+          <div className="flex items-end justify-between mb-6 flex-wrap gap-2">
+            <div>
+              <h1 className="font-display text-3xl font-bold tracking-tighter">Diagrama Gantt</h1>
+              <p className="text-sm text-muted-foreground mt-1">Cronología de obra personalizable</p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {isMobilePortrait && (
+                <Button onClick={() => setForcedLandscape(true)} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
+                  <RotateCcw className="h-4 w-4" /> Girar pantalla
+                </Button>
+              )}
+              {items.length === 0 && (
+                <Button onClick={generateFromDocs} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
+                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+                  {generating ? "Generando..." : "Generar desde documentos"}
+                </Button>
+              )}
+              {canEdit && (
+                <Button onClick={addItem} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
+                  <Plus className="h-4 w-4" /> Añadir Hito
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-12 bg-card border border-border rounded-lg animate-pulse" />)}</div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-20">
+              <BarChart3 className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
+              <p className="font-display text-muted-foreground">No hay hitos definidos</p>
+              <p className="text-xs text-muted-foreground mt-2">Genera automáticamente desde los documentos del proyecto o añade hitos manualmente.</p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-card border border-border rounded-lg overflow-hidden mb-6">
+                <div className="relative h-8 border-b border-border bg-secondary/30 overflow-hidden">
+                  {months.map((m, i) => (
+                    <span key={i} className="absolute top-1.5 text-[10px] font-display uppercase tracking-wider text-muted-foreground" style={{ left: m.left }}>
+                      {m.label}
+                    </span>
+                  ))}
+                </div>
+                <div className="divide-y divide-border">
+                  {sortedItems.map((item, idx) => (
+                    <div key={item.id} className="flex items-center h-10 group">
+                      <div className="w-48 md:w-64 shrink-0 px-3 flex items-center gap-1 border-r border-border">
+                        {canEdit && (
+                          <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => moveItem(item.id, -1)} className="text-muted-foreground hover:text-foreground text-[8px] leading-none">▲</button>
+                            <button onClick={() => moveItem(item.id, 1)} className="text-muted-foreground hover:text-foreground text-[8px] leading-none">▼</button>
+                          </div>
+                        )}
+                        {editingId === item.id ? (
+                          <Input
+                            value={item.title}
+                            onChange={(e) => updateItem(item.id, { title: e.target.value })}
+                            onBlur={() => setEditingId(null)}
+                            onKeyDown={(e) => e.key === "Enter" && setEditingId(null)}
+                            className="h-7 text-xs"
+                            autoFocus
+                          />
+                        ) : (
+                          <button
+                            onClick={() => canEdit && setEditingId(item.id)}
+                            className="text-xs truncate text-left flex-1 hover:text-foreground transition-colors"
+                          >
+                            {item.title}
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex-1 relative h-full px-1">
+                        <div
+                          className="absolute top-2 h-6 rounded"
+                          style={{
+                            ...getBarStyle(item),
+                            backgroundColor: COLORS[idx % COLORS.length],
+                            opacity: 0.8,
+                            minWidth: "4px",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {canEdit && (
+                <>
+                  <h2 className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">Editar hitos</h2>
+                  <div className="space-y-2">
+                    {sortedItems.map((item) => (
+                      <div key={item.id} className="flex items-center gap-2 bg-card border border-border rounded-lg p-3">
+                        <GripVertical className="h-4 w-4 text-muted-foreground/30 shrink-0" />
+                        <Input
+                          value={item.title}
+                          onChange={(e) => updateItem(item.id, { title: e.target.value })}
+                          className="flex-1 h-8 text-xs text-foreground"
+                        />
+                        <Input
+                          type="date"
+                          value={item.start}
+                          onChange={(e) => updateItem(item.id, { start: e.target.value })}
+                          className="w-40 h-8 text-xs text-foreground"
+                        />
+                        <span className="text-xs text-muted-foreground">→</span>
+                        <Input
+                          type="date"
+                          value={item.end}
+                          onChange={(e) => updateItem(item.id, { end: e.target.value })}
+                          className="w-40 h-8 text-xs text-foreground"
+                        />
+                        <Button variant="ghost" size="icon" onClick={() => deleteItem(item.id)} className="text-destructive/60 hover:text-destructive shrink-0 h-8 w-8">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </AppLayout>
   );
 };
