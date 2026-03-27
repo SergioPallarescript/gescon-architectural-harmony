@@ -53,31 +53,51 @@ const AdminPanel = () => {
   const fetchMembers = useCallback(async () => {
     if (!projectId) return;
     
-    // Fetch invited/joined members
+    // Fetch members WITHOUT profile join (no FK exists)
     const { data: memberData } = await supabase
       .from("project_members")
-      .select("*, profiles(full_name, email, role)")
+      .select("*")
       .eq("project_id", projectId);
 
-    // Fetch project creator (may not be in project_members)
+    // Fetch project creator
     const { data: project } = await supabase
       .from("projects")
       .select("created_by")
       .eq("id", projectId)
       .single();
 
-    let allMembers = memberData || [];
+    let allMembers: any[] = memberData || [];
 
-    // If the creator is not already in project_members, add them as a virtual entry
+    // Collect all user_ids to fetch profiles in batch
+    const userIds = allMembers.map((m: any) => m.user_id).filter(Boolean);
+    if (project?.created_by && !userIds.includes(project.created_by)) {
+      userIds.push(project.created_by);
+    }
+
+    // Fetch all profiles at once
+    let profilesMap: Record<string, any> = {};
+    if (userIds.length > 0) {
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email, role")
+        .in("user_id", userIds);
+      
+      if (profilesData) {
+        profilesData.forEach((p: any) => { profilesMap[p.user_id] = p; });
+      }
+    }
+
+    // Attach profile data to each member
+    allMembers = allMembers.map((m: any) => ({
+      ...m,
+      profiles: m.user_id ? profilesMap[m.user_id] || null : null,
+    }));
+
+    // If the creator is not in project_members, add as virtual (read-only) entry
     if (project?.created_by) {
       const creatorInMembers = allMembers.some((m: any) => m.user_id === project.created_by);
       if (!creatorInMembers) {
-        const { data: creatorProfile } = await supabase
-          .from("profiles")
-          .select("full_name, email, role")
-          .eq("user_id", project.created_by)
-          .single();
-
+        const creatorProfile = profilesMap[project.created_by];
         if (creatorProfile) {
           allMembers = [
             {
@@ -88,9 +108,9 @@ const AdminPanel = () => {
               secondary_role: null,
               status: "accepted",
               invited_email: creatorProfile.email,
-              profiles: creatorProfile as any,
+              profiles: creatorProfile,
               _isCreator: true,
-            } as any,
+            },
             ...allMembers,
           ];
         }
