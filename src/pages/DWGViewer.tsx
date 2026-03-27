@@ -343,10 +343,34 @@ const DWGViewer = () => {
 
             {/* Viewer + Measurement overlay */}
             <div className="relative bg-card border border-border rounded-lg overflow-hidden" style={{ height: "calc(100vh - 260px)" }}>
-              {/* DWG Viewer container */}
-              <div ref={viewerContainerRef} className="absolute inset-0" style={{ zIndex: 1 }}>
-              {/* x-viewer manages this div's children directly - no React children here */}
-              </div>
+              {/* Status overlays - rendered by React, above the viewer */}
+              {!viewerLoading && !viewerRef.current && !viewerError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8" style={{ zIndex: 5 }}>
+                  <FileText className="h-16 w-16 text-muted-foreground/20 mb-4" />
+                  <p className="font-display text-muted-foreground mb-2">Pulsa "Renderizar DWG" para cargar el archivo</p>
+                  <p className="text-xs text-muted-foreground/60">El visor CAD procesará el archivo .dwg directamente en el navegador</p>
+                </div>
+              )}
+              {viewerLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ zIndex: 5 }}>
+                  <Loader2 className="h-10 w-10 text-muted-foreground animate-spin mb-3" />
+                  <p className="font-display text-sm text-muted-foreground">Procesando archivo DWG...</p>
+                </div>
+              )}
+              {viewerError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8" style={{ zIndex: 5 }}>
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 max-w-md">
+                    <p className="font-display text-sm text-destructive mb-2">Error al cargar el visor DWG</p>
+                    <p className="text-xs text-muted-foreground mb-4">{viewerError}</p>
+                    <Button variant="outline" size="sm" className="mt-3 text-xs" onClick={() => loadDwgInViewer(selectedFile)}>
+                      Reintentar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* DWG Viewer container - NOT managed by React */}
+              <div ref={viewerContainerRef} className="absolute inset-0" style={{ zIndex: 1 }} />
 
               {/* Measurement overlay canvas */}
               <canvas
