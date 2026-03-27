@@ -15,7 +15,7 @@ const ProjectDocs = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  const canUpload = profile?.role === "DO" || profile?.role === "DEO";
+  const canUpload = profile?.role === "DO" || profile?.role === "DEM";
 
   const fetchDocs = useCallback(async () => {
     if (!projectId) return;
@@ -96,7 +96,7 @@ const ProjectDocs = () => {
           <div>
             <h1 className="font-display text-3xl font-bold tracking-tighter">Documentación</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Base de conocimiento del Cerebro de Obra. Solo DO y DEO pueden subir archivos.
+              Base de conocimiento del Cerebro de Obra. Solo DO y DEM pueden subir archivos.
             </p>
           </div>
           {canUpload && (
