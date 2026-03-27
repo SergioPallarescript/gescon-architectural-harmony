@@ -11,7 +11,6 @@ import {
   Loader2, Crosshair, Target, CheckCircle2,
 } from "lucide-react";
 
-/* ─── Coordinate point (canvas-space, independent of zoom) ─── */
 interface PdfPoint { px: number; py: number; }
 
 interface Measurement {
@@ -44,8 +43,7 @@ const DWGViewer = () => {
   const [uploading, setUploading] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
 
-  /* Rendered file type */
-  const [renderedType, setRenderedType] = useState<"pdf" | "dwg" | null>(null);
+  const [renderedType, setRenderedType] = useState<"pdf" | null>(null);
 
   /* PDF rendering */
   const pdfDocRef = useRef<any>(null);
@@ -74,11 +72,7 @@ const DWGViewer = () => {
   const [calibInput, setCalibInput] = useState("");
   const [showCalibDialog, setShowCalibDialog] = useState(false);
 
-  const canUpload = profile?.role === "DO" || profile?.role === "DEO";
-
-  /* ─── helpers ─── */
-  const isPdf = (name: string) => /\.pdf$/i.test(name);
-  const isDwg = (name: string) => /\.dwg$/i.test(name);
+  const canUpload = profile?.role === "DO" || profile?.role === "DEM";
 
   /* ─── Fetch files ─── */
   const fetchFiles = useCallback(async () => {
@@ -94,11 +88,11 @@ const DWGViewer = () => {
 
   useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
-  /* ─── Upload ─── */
+  /* ─── Upload (PDF only) ─── */
   const handleUpload = async (file: File) => {
     if (!projectId || !user || !canUpload) return;
-    if (!file.name.match(/\.(pdf|dwg)$/i)) {
-      toast.error("Solo se permiten archivos .PDF o .DWG");
+    if (!file.name.match(/\.pdf$/i)) {
+      toast.error("Solo se permiten archivos PDF");
       return;
     }
     setUploading(true);
@@ -127,22 +121,33 @@ const DWGViewer = () => {
     fetchFiles();
   };
 
-  /* ─── PDF rendering ─── */
+  /* ─── PDF rendering with HIGH RESOLUTION ─── */
   const renderPdfPage = useCallback(async (pageNumber: number) => {
     const doc = pdfDocRef.current;
     if (!doc) return;
     const page = await doc.getPage(pageNumber);
     pdfPageRef.current = page;
-    const vp = page.getViewport({ scale: 1.5 });
+
+    // Use high DPI scale for crisp rendering
+    const dpr = window.devicePixelRatio || 1;
+    const baseScale = 3; // High resolution base
+    const renderScale = baseScale * dpr;
+    const vp = page.getViewport({ scale: baseScale });
+    const renderVp = page.getViewport({ scale: renderScale });
     setPdfViewport(vp);
 
     const canvas = pdfCanvasRef.current;
     if (!canvas) return;
-    canvas.width = vp.width;
-    canvas.height = vp.height;
+    // Set canvas internal size to high-res
+    canvas.width = renderVp.width;
+    canvas.height = renderVp.height;
+    // Set display size to logical size
+    canvas.style.width = `${vp.width}px`;
+    canvas.style.height = `${vp.height}px`;
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    await page.render({ canvasContext: ctx, viewport: renderVp }).promise;
   }, []);
 
   const loadPdf = useCallback(async (fileRecord: any) => {
@@ -172,227 +177,30 @@ const DWGViewer = () => {
     }
   }, [renderPdfPage]);
 
-  /* ─── DWG rendering via DxfParser (parses DWG → entities → canvas) ─── */
-  const loadDwg = useCallback(async (fileRecord: any) => {
-    setFileLoading(true);
-    try {
-      const { data: blob } = await supabase.storage.from("plans").download(fileRecord.file_url);
-      if (!blob) throw new Error("No se pudo descargar");
-      const arrayBuf = await blob.arrayBuffer();
-
-      const xViewer = await import("@x-viewer/core");
-      const parser = new xViewer.DxfParser();
-      const dxfData: any = await parser.parseAsync(arrayBuf as any);
-
-      if (!dxfData || !dxfData.entities) throw new Error("No se pudieron extraer entidades del DWG");
-
-      const canvas = pdfCanvasRef.current;
-      if (!canvas) throw new Error("Canvas no disponible");
-
-      /* Compute bounding box */
-      const entities = dxfData.entities;
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-      const expandBounds = (x: number, y: number) => {
-        if (!isFinite(x) || !isFinite(y)) return;
-        minX = Math.min(minX, x); minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
-      };
-
-      for (const e of entities) {
-        if (e.vertices) for (const v of e.vertices) expandBounds(v.x, v.y);
-        if (e.startPoint) expandBounds(e.startPoint.x, e.startPoint.y);
-        if (e.endPoint) expandBounds(e.endPoint.x, e.endPoint.y);
-        if (e.center) {
-          const r = e.radius || 0;
-          expandBounds(e.center.x - r, e.center.y - r);
-          expandBounds(e.center.x + r, e.center.y + r);
-        }
-        if (e.position) expandBounds(e.position.x, e.position.y);
-      }
-
-      if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 1000; maxY = 700; }
-
-      const padding = 60;
-      const drawW = maxX - minX || 1;
-      const drawH = maxY - minY || 1;
-      const cw = 2400;
-      const ch = Math.max(800, Math.round(cw * (drawH / drawW)));
-      canvas.width = cw;
-      canvas.height = ch;
-
-      const scale = Math.min((cw - padding * 2) / drawW, (ch - padding * 2) / drawH);
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("No 2d context");
-
-      /* Dark CAD-style background */
-      ctx.fillStyle = "#1e1e2e";
-      ctx.fillRect(0, 0, cw, ch);
-
-      /* AutoCAD Color Index (ACI) → hex mapping (standard 256 colors, key subset) */
-      const aciColors: Record<number, string> = {
-        0: "#ffffff", 1: "#ff0000", 2: "#ffff00", 3: "#00ff00", 4: "#00ffff",
-        5: "#0000ff", 6: "#ff00ff", 7: "#ffffff", 8: "#808080", 9: "#c0c0c0",
-        10: "#ff0000", 11: "#ff7f7f", 12: "#cc0000", 14: "#ff3333",
-        20: "#ff3300", 30: "#ff6600", 40: "#ff9900", 50: "#ffcc00",
-        60: "#cccc00", 70: "#99cc00", 80: "#66cc00", 90: "#33cc00",
-        100: "#00cc00", 110: "#00cc33", 120: "#00cc66", 130: "#00cc99",
-        140: "#00cccc", 150: "#0099cc", 160: "#0066cc", 170: "#0033cc",
-        180: "#0000cc", 190: "#3300cc", 200: "#6600cc", 210: "#9900cc",
-        220: "#cc00cc", 230: "#cc0099", 240: "#cc0066", 250: "#333333",
-        251: "#505050", 252: "#696969", 253: "#808080", 254: "#b3b3b3", 255: "#e6e6e6",
-      };
-
-      /* Resolve entity color from entity → layer → default */
-      const layerColors: Record<string, number> = {};
-      if (dxfData.tables?.layer?.layers) {
-        for (const [name, layer] of Object.entries(dxfData.tables.layer.layers as Record<string, any>)) {
-          if (layer.color !== undefined) layerColors[name] = layer.color;
-        }
-      }
-
-      const getEntityColor = (e: any): string => {
-        let colorIdx = e.color ?? e.colorIndex;
-        // ByLayer (256) or undefined → use layer color
-        if (colorIdx === undefined || colorIdx === 256 || colorIdx === 0) {
-          const layerName = e.layer || "0";
-          colorIdx = layerColors[layerName] ?? 7;
-        }
-        // Color 7 on dark bg = white
-        if (colorIdx === 7) return "#ffffff";
-        return aciColors[colorIdx] || `hsl(${(colorIdx * 37) % 360}, 70%, 60%)`;
-      };
-
-      /* Transform DWG coords → canvas coords (flip Y) */
-      const toC = (x: number, y: number) => ({
-        cx: padding + (x - minX) * scale,
-        cy: ch - padding - (y - minY) * scale,
-      });
-
-      for (const e of entities) {
-        const color = getEntityColor(e);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        const type = (e.type || "").toUpperCase();
-
-        if (type === "LINE" && e.startPoint && e.endPoint) {
-          const a = toC(e.startPoint.x, e.startPoint.y);
-          const b = toC(e.endPoint.x, e.endPoint.y);
-          ctx.moveTo(a.cx, a.cy); ctx.lineTo(b.cx, b.cy);
-        } else if ((type === "LWPOLYLINE" || type === "POLYLINE") && e.vertices) {
-          const pts = e.vertices.map((v: any) => toC(v.x, v.y));
-          if (pts.length > 0) {
-            ctx.moveTo(pts[0].cx, pts[0].cy);
-            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].cx, pts[i].cy);
-            if (e.shape || e.isClosed) ctx.closePath();
-          }
-        } else if (type === "CIRCLE" && e.center && e.radius) {
-          const c = toC(e.center.x, e.center.y);
-          ctx.arc(c.cx, c.cy, e.radius * scale, 0, Math.PI * 2);
-        } else if (type === "ARC" && e.center && e.radius) {
-          const c = toC(e.center.x, e.center.y);
-          const sa = -(e.endAngle || 0) * Math.PI / 180;
-          const ea = -(e.startAngle || 0) * Math.PI / 180;
-          ctx.arc(c.cx, c.cy, e.radius * scale, sa, ea, false);
-        } else if (type === "ELLIPSE" && e.center) {
-          const c = toC(e.center.x, e.center.y);
-          const rx = Math.hypot(e.majorAxisEndPoint?.x || 1, e.majorAxisEndPoint?.y || 0) * scale;
-          const ry = rx * (e.axisRatio || 1);
-          ctx.ellipse(c.cx, c.cy, rx, ry, 0, 0, Math.PI * 2);
-        } else if (type === "SPLINE" && e.controlPoints) {
-          const pts = e.controlPoints.map((v: any) => toC(v.x, v.y));
-          if (pts.length > 0) {
-            ctx.moveTo(pts[0].cx, pts[0].cy);
-            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].cx, pts[i].cy);
-          }
-        } else if (type === "POINT" && e.position) {
-          const p = toC(e.position.x, e.position.y);
-          ctx.arc(p.cx, p.cy, 2, 0, Math.PI * 2);
-          ctx.fillStyle = color; ctx.fill();
-        } else if (type === "SOLID" && e.points) {
-          const pts = e.points.map((v: any) => toC(v.x, v.y));
-          if (pts.length >= 3) {
-            ctx.moveTo(pts[0].cx, pts[0].cy);
-            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].cx, pts[i].cy);
-            ctx.closePath();
-            ctx.fillStyle = color; ctx.fill();
-          }
-        } else if (type === "INSERT" && e.name && dxfData.blocks?.[e.name]) {
-          /* Render block inserts */
-          const block = dxfData.blocks[e.name];
-          const insertX = e.position?.x || 0;
-          const insertY = e.position?.y || 0;
-          const scaleX = e.xScale || 1;
-          const scaleY = e.yScale || 1;
-          if (block.entities) {
-            for (const be of block.entities) {
-              const beColor = getEntityColor({ ...be, layer: be.layer || e.layer });
-              ctx.strokeStyle = beColor;
-              ctx.beginPath();
-              const bt = (be.type || "").toUpperCase();
-              if (bt === "LINE" && be.startPoint && be.endPoint) {
-                const a = toC(insertX + be.startPoint.x * scaleX, insertY + be.startPoint.y * scaleY);
-                const b = toC(insertX + be.endPoint.x * scaleX, insertY + be.endPoint.y * scaleY);
-                ctx.moveTo(a.cx, a.cy); ctx.lineTo(b.cx, b.cy);
-              } else if ((bt === "LWPOLYLINE" || bt === "POLYLINE") && be.vertices) {
-                const pts = be.vertices.map((v: any) => toC(insertX + v.x * scaleX, insertY + v.y * scaleY));
-                if (pts.length > 0) {
-                  ctx.moveTo(pts[0].cx, pts[0].cy);
-                  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].cx, pts[i].cy);
-                  if (be.shape || be.isClosed) ctx.closePath();
-                }
-              } else if (bt === "CIRCLE" && be.center && be.radius) {
-                const c = toC(insertX + be.center.x * scaleX, insertY + be.center.y * scaleY);
-                ctx.arc(c.cx, c.cy, be.radius * scale * Math.abs(scaleX), 0, Math.PI * 2);
-              } else if (bt === "ARC" && be.center && be.radius) {
-                const c = toC(insertX + be.center.x * scaleX, insertY + be.center.y * scaleY);
-                const sa = -(be.endAngle || 0) * Math.PI / 180;
-                const ea = -(be.startAngle || 0) * Math.PI / 180;
-                ctx.arc(c.cx, c.cy, be.radius * scale * Math.abs(scaleX), sa, ea, false);
-              }
-              ctx.stroke();
-            }
-          }
-        }
-        ctx.stroke();
-      }
-
-      setRenderedType("dwg");
-      setTotalPages(0);
-      fitToContainer();
-      setFileLoading(false);
-      toast.success("DWG renderizado. Calibra la escala antes de medir.");
-    } catch (err: any) {
-      console.error("DWG load error:", err);
-      toast.error("Error al renderizar DWG: " + (err.message || ""));
-      setFileLoading(false);
-    }
-  }, []);
-
   /* Fit to container */
   const fitToContainer = () => {
     setTimeout(() => {
       const container = containerRef.current;
       const pdfCanvas = pdfCanvasRef.current;
       if (container && pdfCanvas) {
-        const scaleX = container.clientWidth / pdfCanvas.width;
-        const scaleY = container.clientHeight / pdfCanvas.height;
+        // Use display size (style width/height) for fitting
+        const displayW = parseFloat(pdfCanvas.style.width) || pdfCanvas.width;
+        const displayH = parseFloat(pdfCanvas.style.height) || pdfCanvas.height;
+        const scaleX = container.clientWidth / displayW;
+        const scaleY = container.clientHeight / displayH;
         const fitZoom = Math.min(scaleX, scaleY, 1) * 0.95;
         setZoom(fitZoom);
         setOffset({
-          x: (container.clientWidth - pdfCanvas.width * fitZoom) / 2,
-          y: (container.clientHeight - pdfCanvas.height * fitZoom) / 2,
+          x: (container.clientWidth - displayW * fitZoom) / 2,
+          y: (container.clientHeight - displayH * fitZoom) / 2,
         });
       }
     }, 50);
   };
 
-  /* Load file based on type */
+  /* Load file */
   const loadFile = (fileRecord: any) => {
-    if (isPdf(fileRecord.file_name)) loadPdf(fileRecord);
-    else if (isDwg(fileRecord.file_name)) loadDwg(fileRecord);
+    loadPdf(fileRecord);
   };
 
   /* Change page (PDF only) */
@@ -403,11 +211,23 @@ const DWGViewer = () => {
     await renderPdfPage(next);
   };
 
-  /* ─── Coordinate conversions ─── */
-  const screenToPdf = useCallback((sx: number, sy: number): PdfPoint => ({
-    px: (sx - offset.x) / zoom,
-    py: (sy - offset.y) / zoom,
-  }), [offset, zoom]);
+  /* ─── Coordinate conversions (use display size) ─── */
+  const getDisplaySize = useCallback(() => {
+    const canvas = pdfCanvasRef.current;
+    if (!canvas) return { w: 1, h: 1 };
+    return {
+      w: parseFloat(canvas.style.width) || canvas.width,
+      h: parseFloat(canvas.style.height) || canvas.height,
+    };
+  }, []);
+
+  const screenToPdf = useCallback((sx: number, sy: number): PdfPoint => {
+    const { w, h } = getDisplaySize();
+    return {
+      px: (sx - offset.x) / zoom,
+      py: (sy - offset.y) / zoom,
+    };
+  }, [offset, zoom, getDisplaySize]);
 
   const pdfToScreen = useCallback((p: PdfPoint) => ({
     x: p.px * zoom + offset.x,
@@ -676,6 +496,38 @@ const DWGViewer = () => {
 
   const isFileLoaded = renderedType !== null;
 
+  /* ─── Touch handlers for mobile ─── */
+  const lastTouchRef = useRef<{ x: number; y: number; dist?: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && tool === "move") {
+      const t = e.touches[0];
+      lastTouchRef.current = { x: t.clientX - offset.x, y: t.clientY - offset.y };
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastTouchRef.current = { x: 0, y: 0, dist: Math.hypot(dx, dy) };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (e.touches.length === 1 && tool === "move" && lastTouchRef.current && !lastTouchRef.current.dist) {
+      const t = e.touches[0];
+      setOffset({ x: t.clientX - lastTouchRef.current.x, y: t.clientY - lastTouchRef.current.y });
+    } else if (e.touches.length === 2 && lastTouchRef.current?.dist) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const scale = newDist / lastTouchRef.current.dist;
+      const newZoom = Math.max(0.05, Math.min(20, zoom * scale));
+      setZoom(newZoom);
+      lastTouchRef.current.dist = newDist;
+    }
+  };
+
+  const handleTouchEnd = () => { lastTouchRef.current = null; };
+
   /* ─── RENDER ─── */
   return (
     <AppLayout>
@@ -694,12 +546,12 @@ const DWGViewer = () => {
             <div className="flex items-end justify-between mb-6">
               <div>
                 <h1 className="font-display text-3xl font-bold tracking-tighter">Metro Digital</h1>
-                <p className="text-sm text-muted-foreground mt-1">Sube un plano (PDF o DWG). Calibra dos puntos de una cota conocida y mide con precisión.</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Solo DO y DEO pueden subir archivos · Formatos: PDF, DWG</p>
+                <p className="text-sm text-muted-foreground mt-1">Sube un plano PDF. Calibra dos puntos de una cota conocida y mide con precisión.</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Solo DO y DEM pueden subir archivos · Formato: PDF</p>
               </div>
               {canUpload && (
                 <label className="cursor-pointer">
-                  <input type="file" className="hidden" accept=".pdf,.dwg" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
+                  <input type="file" className="hidden" accept=".pdf" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
                   <Button asChild variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={uploading}>
                     <span><Upload className="h-4 w-4" />{uploading ? "Subiendo..." : "Subir Plano"}</span>
                   </Button>
@@ -713,7 +565,7 @@ const DWGViewer = () => {
               <div className="text-center py-20">
                 <Ruler className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
                 <p className="font-display text-muted-foreground">No hay planos subidos.</p>
-                {canUpload && <p className="text-xs text-muted-foreground mt-2">Sube un PDF o DWG con escala gráfica para calibrar y medir.</p>}
+                {canUpload && <p className="text-xs text-muted-foreground mt-2">Sube un PDF con escala gráfica para calibrar y medir.</p>}
               </div>
             ) : (
               <div className="space-y-2">
@@ -729,7 +581,7 @@ const DWGViewer = () => {
                       <div>
                         <p className="text-sm font-medium">{f.file_name}</p>
                         <p className="text-[10px] text-muted-foreground">
-                          {isPdf(f.file_name) ? "PDF" : "DWG"} · {f.file_size ? `${(f.file_size / 1024).toFixed(0)} KB` : ""} · {new Date(f.created_at).toLocaleDateString("es-ES")}
+                          PDF · {f.file_size ? `${(f.file_size / 1024).toFixed(0)} KB` : ""} · {new Date(f.created_at).toLocaleDateString("es-ES")}
                         </p>
                       </div>
                     </button>
@@ -759,7 +611,7 @@ const DWGViewer = () => {
                     <CheckCircle2 className="h-3.5 w-3.5" /> Calibrado ({calibration.pdfUnitsPerMeter.toFixed(0)} px/m)
                   </span>
                 )}
-                {renderedType === "pdf" && totalPages > 1 && (
+                {totalPages > 1 && (
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" onClick={() => changePage(-1)} disabled={pageNum <= 1} className="text-xs h-7 px-2">←</Button>
                     <span className="text-[10px] text-muted-foreground font-display">{pageNum}/{totalPages}</span>
@@ -799,8 +651,7 @@ const DWGViewer = () => {
                 <>
                   <div className="w-px h-6 bg-border mx-1" />
                   <Button variant="outline" size="sm" onClick={() => loadFile(selectedFile)} className="gap-1 text-xs">
-                    <FileText className="h-3.5 w-3.5" />
-                    Cargar {isPdf(selectedFile.file_name) ? "PDF" : "DWG"}
+                    <FileText className="h-3.5 w-3.5" /> Cargar PDF
                   </Button>
                 </>
               )}
@@ -809,106 +660,98 @@ const DWGViewer = () => {
             {/* Calibration help banner */}
             {!calibration && isFileLoaded && (
               <div className="mb-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                <p className="text-xs font-display text-blue-800 dark:text-blue-200">
-                  <strong>Paso 1 — Calibrar escala:</strong> Pulsa "Calibrar", marca los dos extremos de una cota conocida o barra de escala del plano, e introduce la distancia real en metros.
+                <p className="text-xs text-blue-800 dark:text-blue-200 font-display">
+                  <strong>① Calibrar:</strong> Selecciona la herramienta "Calibrar", marca dos puntos de una cota conocida o barra gráfica en el plano, e introduce la distancia real. Las medidas serán precisas independientemente del zoom.
                 </p>
               </div>
             )}
 
-            {/* Viewer area */}
-            <div ref={containerRef} className="relative bg-muted/30 border border-border rounded-lg overflow-hidden" style={{ height: "calc(100vh - 280px)" }}>
+            {/* Canvas container */}
+            <div
+              ref={containerRef}
+              className="relative border border-border rounded-lg overflow-hidden bg-muted"
+              style={{ height: "calc(100vh - 280px)", cursor: tool === "move" ? "grab" : "crosshair" }}
+              onMouseUp={() => setDragging(false)}
+              onMouseLeave={() => { setDragging(false); setMouseScreenPos(null); }}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              {fileLoading && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80">
+                  <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground mt-2 font-display">Cargando plano en alta resolución...</p>
+                  </div>
+                </div>
+              )}
               <canvas
                 ref={pdfCanvasRef}
                 className="absolute"
                 style={{
                   transformOrigin: "0 0",
                   transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-                  imageRendering: "auto",
-                  zIndex: 1,
                 }}
               />
-
-              {fileLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ zIndex: 5, pointerEvents: "none" }}>
-                  <Loader2 className="h-10 w-10 text-muted-foreground animate-spin mb-3" />
-                  <p className="font-display text-sm text-muted-foreground">Cargando {isPdf(selectedFile.file_name) ? "PDF" : "DWG"}…</p>
-                </div>
-              )}
-
-              {!isFileLoaded && !fileLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8" style={{ zIndex: 5, pointerEvents: "none" }}>
-                  <FileText className="h-16 w-16 text-muted-foreground/20 mb-4" />
-                  <p className="font-display text-muted-foreground mb-2">
-                    Pulsa "Cargar {isPdf(selectedFile.file_name) ? "PDF" : "DWG"}" para visualizar el plano
-                  </p>
-                </div>
-              )}
-
               <canvas
                 ref={overlayCanvasRef}
-                className="absolute inset-0 w-full h-full"
-                style={{
-                  zIndex: 10,
-                  cursor: tool === "move" ? (dragging ? "grabbing" : "grab") : "crosshair",
-                }}
+                className="absolute inset-0 z-10"
                 onClick={handleCanvasClick}
-                onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
-                onMouseUp={() => setDragging(false)}
-                onMouseLeave={() => { setDragging(false); setMouseScreenPos(null); setSnappedPoint(null); }}
+                onMouseDown={handleMouseDown}
                 onWheel={handleWheel}
               />
             </div>
 
-            {/* Calibration dialog */}
-            {showCalibDialog && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center" style={{ zIndex: 50 }}>
-                <div className="bg-card border border-border rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
-                  <h3 className="font-display text-lg font-bold mb-2">Calibrar escala</h3>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    Has marcado dos puntos sobre el plano. Introduce la distancia real que representan.
-                  </p>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Input
-                      type="number" step="0.01" min="0.01" placeholder="Ej: 5.00"
-                      value={calibInput} onChange={(e) => setCalibInput(e.target.value)}
-                      className="flex-1" autoFocus
-                    />
-                    <span className="text-sm font-display text-muted-foreground">metros</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => { setShowCalibDialog(false); setCalibPoints([]); }} className="flex-1 text-xs">Cancelar</Button>
-                    <Button onClick={confirmCalibration} className="flex-1 text-xs gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Confirmar
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Measurements panel */}
+            {/* Measurements list */}
             {measurements.length > 0 && (
-              <div className="mt-3 bg-card border border-border rounded-lg p-4">
-                <h3 className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Mediciones ({measurements.length})</h3>
+              <div className="mt-3 bg-card border border-border rounded-lg p-3">
+                <h3 className="font-display text-xs uppercase tracking-wider text-muted-foreground mb-2">Mediciones ({measurements.length})</h3>
                 <div className="space-y-1">
                   {measurements.map((m, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{m.type === "line" ? "📏 Distancia" : "📐 Área"} #{i + 1}</span>
-                      <span className="font-display font-bold">
-                        {m.type === "line" ? `${m.value.toFixed(2)} m` : `${m.value.toFixed(2)} m²`}
-                      </span>
+                      <span className="text-muted-foreground">{m.type === "line" ? "📏" : "📐"} Medida {i + 1}</span>
+                      <span className="font-display font-bold">{m.value.toFixed(2)} {m.type === "line" ? "m" : "m²"}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-
-            <p className="text-[10px] text-muted-foreground/40 mt-2 text-center">
-              Calibra marcando dos puntos de una cota conocida · Las medidas son independientes del zoom · Snap detecta puntos de medición previos
-            </p>
           </>
         )}
       </div>
+
+      {/* Calibration dialog */}
+      {showCalibDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-sm mx-4">
+            <h3 className="font-display text-lg font-bold tracking-tighter mb-2">Calibrar Escala</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Has marcado dos puntos en el plano. Introduce la distancia real entre ellos para calibrar las medidas.
+            </p>
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="text-xs font-display uppercase tracking-wider text-muted-foreground">Distancia real (metros)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={calibInput}
+                  onChange={(e) => setCalibInput(e.target.value)}
+                  placeholder="5.00"
+                  className="mt-1"
+                  autoFocus
+                />
+              </div>
+              <Button onClick={confirmCalibration} className="font-display text-xs uppercase tracking-wider">
+                Calibrar
+              </Button>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => { setShowCalibDialog(false); setCalibPoints([]); }} className="mt-2 text-xs w-full">
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 };
