@@ -36,7 +36,9 @@ const OrdersModule = () => {
 
   const isDEM = profile?.role === "DEM";
   const isDO = profile?.role === "DO";
-  const canWrite = isDEM;
+  // Dual role: check if user has secondary_role CSS via project_members
+  const [hasDualCSS, setHasDualCSS] = useState(false);
+  const canWrite = isDEM || isDO || hasDualCSS;
   const canValidate = profile?.role === "CON" || profile?.role === "PRO";
 
   const fetchOrders = useCallback(async () => {

@@ -41,7 +41,8 @@ const IncidentsModule = () => {
   const [recording, setRecording] = useState(false);
 
   const isCSS = profile?.role === "CSS";
-  const canWrite = isCSS;
+  const [hasDualCSS, setHasDualCSS] = useState(false);
+  const canWrite = isCSS || hasDualCSS;
 
   const fetchIncidents = useCallback(async () => {
     if (!projectId) return;
