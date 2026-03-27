@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { notifyProjectMembers } from "@/lib/notifications";
 import {
   ArrowLeft,
   Upload,

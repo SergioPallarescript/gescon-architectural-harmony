@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { notifyUser } from "@/lib/notifications";
 import { ArrowLeft, Shield, Trash2, History } from "lucide-react";
 
 type AppRole = "DO" | "DEM" | "CON" | "PRO" | "CSS";
