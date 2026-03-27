@@ -18,6 +18,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { notifyProjectMembers } from "@/lib/notifications";
 import {
   ArrowLeft, Plus, ShieldAlert, CheckCircle2, Mic, MicOff, Camera, Image, Paperclip, Pencil, Trash2,
 } from "lucide-react";
@@ -105,6 +106,13 @@ const IncidentsModule = () => {
       user_id: user.id, project_id: projectId,
       action: "incident_created", details: { severity, has_photos: photoUrls.length > 0 },
     });
+    await notifyProjectMembers({
+      projectId,
+      actorId: user.id,
+      title: "Nueva incidencia registrada",
+      message: `Se ha registrado una incidencia de gravedad ${severity}`,
+      type: severity === "critical" || severity === "high" ? "warning" : "info",
+    });
     toast.success("Incidencia registrada");
     setContent(""); setSeverity("medium"); setRemedial(""); setPhotos([]);
     setCreateOpen(false); setSubmitting(false); fetchIncidents();
@@ -123,6 +131,13 @@ const IncidentsModule = () => {
       user_id: user.id, project_id: projectId!,
       action: "incident_edited", details: { incident_id: editIncident.id },
     });
+    await notifyProjectMembers({
+      projectId: projectId!,
+      actorId: user.id,
+      title: "Incidencia editada",
+      message: `La incidencia #${editIncident.incident_number} ha sido modificada`,
+      type: "info",
+    });
     toast.success("Incidencia actualizada");
     setEditIncident(null); setEditSubmitting(false); fetchIncidents();
   };
@@ -134,6 +149,13 @@ const IncidentsModule = () => {
     await supabase.from("audit_logs").insert({
       user_id: user.id, project_id: projectId!,
       action: "incident_deleted", details: { incident_id: deleteIncidentId },
+    });
+    await notifyProjectMembers({
+      projectId: projectId!,
+      actorId: user.id,
+      title: "Incidencia eliminada",
+      message: `Se ha eliminado una incidencia del Libro de Incidencias`,
+      type: "warning",
     });
     toast.success("Incidencia eliminada");
     setDeleteIncidentId(null); fetchIncidents();

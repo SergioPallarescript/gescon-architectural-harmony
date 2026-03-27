@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { notifyProjectMembers } from "@/lib/notifications";
 import {
   ArrowLeft,
   Upload,
@@ -199,6 +200,14 @@ const PlansModule = () => {
       details: { plan_name: newPlan.name },
     });
 
+    await notifyProjectMembers({
+      projectId,
+      actorId: user.id,
+      title: "Nuevo plano creado",
+      message: `Se ha creado el plano "${newPlan.name}"`,
+      type: "plan",
+    });
+
     setNewPlan({ name: "", description: "", category: "" });
     setCreateOpen(false);
     fetchPlans();
@@ -251,6 +260,14 @@ const PlansModule = () => {
           version: actualVersion,
           file_name: uploadFile.name,
         },
+      });
+
+      await notifyProjectMembers({
+        projectId,
+        actorId: user.id,
+        title: "Nueva versión de plano",
+        message: `Se ha subido la versión ${actualVersion} del plano "${selectedPlan.name}"`,
+        type: "plan",
       });
 
       setSelectedPlan({ ...selectedPlan, current_version: actualVersion });
