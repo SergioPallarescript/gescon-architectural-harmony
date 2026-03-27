@@ -37,6 +37,7 @@ import {
   MessageCircle,
   FolderOpen,
   BarChart3,
+  Shield,
 } from "lucide-react";
 
 type AppRole = "DO" | "DEM" | "CON" | "PRO" | "CSS";
