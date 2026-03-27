@@ -327,23 +327,27 @@ const AdminPanel = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Select
-                            value={currentRole}
-                            onValueChange={(val) =>
-                              handleRoleChange(member.id, val as AppRole, email, currentRole)
-                            }
-                          >
-                            <SelectTrigger className="w-[220px] h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(Object.keys(roleLabels) as AppRole[]).map((role) => (
-                                <SelectItem key={role} value={role} className="text-xs">
-                                  {roleLabels[role]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {isVirtualCreator ? (
+                            <Badge className={roleColors[currentRole]}>{roleLabels[currentRole]}</Badge>
+                          ) : (
+                            <Select
+                              value={currentRole}
+                              onValueChange={(val) =>
+                                handleRoleChange(member.id, val as AppRole, email, currentRole)
+                              }
+                            >
+                              <SelectTrigger className="w-[220px] h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(Object.keys(roleLabels) as AppRole[]).map((role) => (
+                                  <SelectItem key={role} value={role} className="text-xs">
+                                    {roleLabels[role]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                         </TableCell>
                         <TableCell>
                           {currentRole === "DEM" ? (
