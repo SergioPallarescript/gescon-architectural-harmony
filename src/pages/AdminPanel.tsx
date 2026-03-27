@@ -53,31 +53,51 @@ const AdminPanel = () => {
   const fetchMembers = useCallback(async () => {
     if (!projectId) return;
     
-    // Fetch invited/joined members
+    // Fetch members WITHOUT profile join (no FK exists)
     const { data: memberData } = await supabase
       .from("project_members")
-      .select("*, profiles(full_name, email, role)")
+      .select("*")
       .eq("project_id", projectId);
 
-    // Fetch project creator (may not be in project_members)
+    // Fetch project creator
     const { data: project } = await supabase
       .from("projects")
       .select("created_by")
       .eq("id", projectId)
       .single();
 
-    let allMembers = memberData || [];
+    let allMembers: any[] = memberData || [];
 
-    // If the creator is not already in project_members, add them as a virtual entry
+    // Collect all user_ids to fetch profiles in batch
+    const userIds = allMembers.map((m: any) => m.user_id).filter(Boolean);
+    if (project?.created_by && !userIds.includes(project.created_by)) {
+      userIds.push(project.created_by);
+    }
+
+    // Fetch all profiles at once
+    let profilesMap: Record<string, any> = {};
+    if (userIds.length > 0) {
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email, role")
+        .in("user_id", userIds);
+      
+      if (profilesData) {
+        profilesData.forEach((p: any) => { profilesMap[p.user_id] = p; });
+      }
+    }
+
+    // Attach profile data to each member
+    allMembers = allMembers.map((m: any) => ({
+      ...m,
+      profiles: m.user_id ? profilesMap[m.user_id] || null : null,
+    }));
+
+    // If the creator is not in project_members, add as virtual (read-only) entry
     if (project?.created_by) {
       const creatorInMembers = allMembers.some((m: any) => m.user_id === project.created_by);
       if (!creatorInMembers) {
-        const { data: creatorProfile } = await supabase
-          .from("profiles")
-          .select("full_name, email, role")
-          .eq("user_id", project.created_by)
-          .single();
-
+        const creatorProfile = profilesMap[project.created_by];
         if (creatorProfile) {
           allMembers = [
             {
@@ -88,9 +108,9 @@ const AdminPanel = () => {
               secondary_role: null,
               status: "accepted",
               invited_email: creatorProfile.email,
-              profiles: creatorProfile as any,
+              profiles: creatorProfile,
               _isCreator: true,
-            } as any,
+            },
             ...allMembers,
           ];
         }
@@ -119,7 +139,12 @@ const AdminPanel = () => {
   }, [fetchMembers, fetchAuditLogs]);
 
   const handleRoleChange = async (memberId: string, newRole: AppRole, memberEmail: string, oldRole: string) => {
-    if (!user || !projectId) return;
+    if (!user || !projectId || memberId.startsWith("creator-")) {
+      if (memberId.startsWith("creator-")) {
+        toast.error("El creador del proyecto no puede cambiar su rol desde aquí");
+      }
+      return;
+    }
 
     const { error } = await supabase
       .from("project_members")
@@ -276,12 +301,16 @@ const AdminPanel = () => {
                     const name = member.profiles?.full_name || email;
                     const currentRole = member.role as AppRole;
                     const secondaryRole = member.secondary_role as string | null;
+                    const isVirtualCreator = member._isCreator === true;
 
                     return (
                       <TableRow key={member.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium text-foreground text-sm">{name}</p>
+                            <p className="font-medium text-foreground text-sm">
+                              {name}
+                              {isVirtualCreator && <span className="ml-2 text-xs text-primary">(Creador)</span>}
+                            </p>
                             <p className="text-xs text-muted-foreground">{email}</p>
                           </div>
                         </TableCell>
@@ -298,23 +327,27 @@ const AdminPanel = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Select
-                            value={currentRole}
-                            onValueChange={(val) =>
-                              handleRoleChange(member.id, val as AppRole, email, currentRole)
-                            }
-                          >
-                            <SelectTrigger className="w-[220px] h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(Object.keys(roleLabels) as AppRole[]).map((role) => (
-                                <SelectItem key={role} value={role} className="text-xs">
-                                  {roleLabels[role]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {isVirtualCreator ? (
+                            <Badge className={roleColors[currentRole]}>{roleLabels[currentRole]}</Badge>
+                          ) : (
+                            <Select
+                              value={currentRole}
+                              onValueChange={(val) =>
+                                handleRoleChange(member.id, val as AppRole, email, currentRole)
+                              }
+                            >
+                              <SelectTrigger className="w-[220px] h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(Object.keys(roleLabels) as AppRole[]).map((role) => (
+                                  <SelectItem key={role} value={role} className="text-xs">
+                                    {roleLabels[role]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                         </TableCell>
                         <TableCell>
                           {currentRole === "DEM" ? (
@@ -334,14 +367,16 @@ const AdminPanel = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => setDeleteTarget(member)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {!isVirtualCreator && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeleteTarget(member)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
