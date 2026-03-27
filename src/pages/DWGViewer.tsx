@@ -172,70 +172,121 @@ const DWGViewer = () => {
     }
   }, [renderPdfPage]);
 
-  /* ─── DWG rendering via @x-viewer/core Viewer2d ─── */
-  const dwgContainerRef = useRef<HTMLDivElement>(null);
-  const dwgViewerRef = useRef<any>(null);
-
+  /* ─── DWG rendering via DxfParser (parses DWG → entities → canvas) ─── */
   const loadDwg = useCallback(async (fileRecord: any) => {
     setFileLoading(true);
     try {
       const { data: blob } = await supabase.storage.from("plans").download(fileRecord.file_url);
       if (!blob) throw new Error("No se pudo descargar");
-      const url = URL.createObjectURL(blob);
-
-      // Create a temporary container for the viewer
-      const container = dwgContainerRef.current;
-      if (!container) throw new Error("Container no disponible");
-      container.style.width = "2000px";
-      container.style.height = "1400px";
-      container.innerHTML = "";
-
-      const viewerDiv = document.createElement("div");
-      viewerDiv.id = "dwg-viewer-" + Date.now();
-      viewerDiv.style.width = "100%";
-      viewerDiv.style.height = "100%";
-      container.appendChild(viewerDiv);
+      const arrayBuf = await blob.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuf);
 
       const xViewer = await import("@x-viewer/core");
-      
-      // Ensure libredwg WASM is loaded for DWG support
-      await xViewer.ensureLibredwgLoaded();
-      
-      const viewer = new xViewer.Viewer2d({
-        containerId: viewerDiv.id,
-        enableSpinner: false,
-        enableProgressBar: false,
-      });
-      dwgViewerRef.current = viewer;
+      const parser = new xViewer.DxfParser();
+      const dxfData = await parser.parseAsync(uint8);
 
-      const loader = new xViewer.DxfLoader(viewer);
-      const dxfData = await loader.loadAsync(url);
-      const model = new xViewer.Model2d(dxfData as any);
-      viewer.addModel(model);
-      viewer.viewFitAll();
-      viewer.enableRender(0);
+      if (!dxfData || !dxfData.entities) throw new Error("No se pudieron extraer entidades del DWG");
 
-      // Wait for render, then capture to our canvas
-      await new Promise(r => setTimeout(r, 1500));
+      const canvas = pdfCanvasRef.current;
+      if (!canvas) throw new Error("Canvas no disponible");
 
-      const webglCanvas = viewerDiv.querySelector("canvas");
-      if (webglCanvas) {
-        const canvas = pdfCanvasRef.current;
-        if (canvas) {
-          canvas.width = webglCanvas.width;
-          canvas.height = webglCanvas.height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(webglCanvas, 0, 0);
-          }
+      /* Compute bounding box */
+      const entities = dxfData.entities;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      const expandBounds = (x: number, y: number) => {
+        if (!isFinite(x) || !isFinite(y)) return;
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+      };
+
+      for (const e of entities) {
+        if (e.vertices) for (const v of e.vertices) expandBounds(v.x, v.y);
+        if (e.startPoint) expandBounds(e.startPoint.x, e.startPoint.y);
+        if (e.endPoint) expandBounds(e.endPoint.x, e.endPoint.y);
+        if (e.center) {
+          const r = e.radius || 0;
+          expandBounds(e.center.x - r, e.center.y - r);
+          expandBounds(e.center.x + r, e.center.y + r);
         }
+        if (e.position) expandBounds(e.position.x, e.position.y);
       }
 
-      URL.revokeObjectURL(url);
-      // Clean up viewer DOM but keep canvas snapshot
-      container.innerHTML = "";
+      if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 1000; maxY = 700; }
+
+      const padding = 60;
+      const drawW = maxX - minX || 1;
+      const drawH = maxY - minY || 1;
+      const cw = 2400;
+      const ch = Math.max(800, Math.round(cw * (drawH / drawW)));
+      canvas.width = cw;
+      canvas.height = ch;
+
+      const scale = Math.min((cw - padding * 2) / drawW, (ch - padding * 2) / drawH);
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("No 2d context");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, cw, ch);
+
+      /* Transform DWG coords → canvas coords (flip Y) */
+      const toC = (x: number, y: number) => ({
+        cx: padding + (x - minX) * scale,
+        cy: ch - padding - (y - minY) * scale,
+      });
+
+      ctx.strokeStyle = "#1a1a1a";
+      ctx.lineWidth = 1;
+
+      for (const e of entities) {
+        ctx.beginPath();
+        const type = (e.type || "").toUpperCase();
+
+        if (type === "LINE" && e.startPoint && e.endPoint) {
+          const a = toC(e.startPoint.x, e.startPoint.y);
+          const b = toC(e.endPoint.x, e.endPoint.y);
+          ctx.moveTo(a.cx, a.cy); ctx.lineTo(b.cx, b.cy);
+        } else if ((type === "LWPOLYLINE" || type === "POLYLINE") && e.vertices) {
+          const pts = e.vertices.map((v: any) => toC(v.x, v.y));
+          if (pts.length > 0) {
+            ctx.moveTo(pts[0].cx, pts[0].cy);
+            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].cx, pts[i].cy);
+            if (e.shape || e.isClosed) ctx.closePath();
+          }
+        } else if (type === "CIRCLE" && e.center && e.radius) {
+          const c = toC(e.center.x, e.center.y);
+          ctx.arc(c.cx, c.cy, e.radius * scale, 0, Math.PI * 2);
+        } else if (type === "ARC" && e.center && e.radius) {
+          const c = toC(e.center.x, e.center.y);
+          const sa = -(e.endAngle || 0) * Math.PI / 180;
+          const ea = -(e.startAngle || 0) * Math.PI / 180;
+          ctx.arc(c.cx, c.cy, e.radius * scale, sa, ea, false);
+        } else if (type === "ELLIPSE" && e.center) {
+          const c = toC(e.center.x, e.center.y);
+          const rx = Math.hypot(e.majorAxisEndPoint?.x || 1, e.majorAxisEndPoint?.y || 0) * scale;
+          const ry = rx * (e.axisRatio || 1);
+          ctx.ellipse(c.cx, c.cy, rx, ry, 0, 0, Math.PI * 2);
+        } else if (type === "SPLINE" && e.controlPoints) {
+          const pts = e.controlPoints.map((v: any) => toC(v.x, v.y));
+          if (pts.length > 0) {
+            ctx.moveTo(pts[0].cx, pts[0].cy);
+            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].cx, pts[i].cy);
+          }
+        } else if (type === "POINT" && e.position) {
+          const p = toC(e.position.x, e.position.y);
+          ctx.arc(p.cx, p.cy, 2, 0, Math.PI * 2);
+          ctx.fillStyle = "#1a1a1a"; ctx.fill();
+        } else if (type === "SOLID" && e.points) {
+          const pts = e.points.map((v: any) => toC(v.x, v.y));
+          if (pts.length >= 3) {
+            ctx.moveTo(pts[0].cx, pts[0].cy);
+            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].cx, pts[i].cy);
+            ctx.closePath();
+            ctx.fillStyle = "#cccccc"; ctx.fill();
+          }
+        }
+        ctx.stroke();
+      }
 
       setRenderedType("dwg");
       setTotalPages(0);
