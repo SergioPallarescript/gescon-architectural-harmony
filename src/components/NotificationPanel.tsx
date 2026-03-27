@@ -45,10 +45,28 @@ const NotificationPanel = ({ onClose }: { onClose: () => void }) => {
     fetch();
   }, []);
 
+  const getNotificationRoute = (notif: NotificationItem): string | null => {
+    if (!notif.project_id) return null;
+    const t = notif.title.toLowerCase();
+    if (t.includes("orden")) return `/project/${notif.project_id}/orders`;
+    if (t.includes("plano") || t.includes("versión") || t.includes("version")) return `/project/${notif.project_id}/plans`;
+    if (t.includes("incidencia")) return `/project/${notif.project_id}/incidents`;
+    if (t.includes("gantt") || t.includes("hito")) return `/project/${notif.project_id}/gantt`;
+    if (t.includes("rol") || t.includes("agente") || t.includes("eliminado del proyecto")) return `/project/${notif.project_id}/admin`;
+    if (t.includes("cfo") || t.includes("reclamación") || t.includes("documento")) return `/project/${notif.project_id}/cfo`;
+    return `/project/${notif.project_id}`;
+  };
+
   const handleNotificationClick = (notif: NotificationItem) => {
     if (!notif.is_read) {
       setSelectedNotif(notif);
       setShowAckDialog(true);
+    } else {
+      const route = getNotificationRoute(notif);
+      if (route) {
+        onClose();
+        navigate(route);
+      }
     }
   };
 
