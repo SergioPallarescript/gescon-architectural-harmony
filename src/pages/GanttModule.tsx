@@ -109,30 +109,7 @@ const GanttModule = () => {
         });
       });
 
-      // Add milestones from docs
-      if (docs && docs.length > 0) {
-        docs.slice(0, 5).forEach((doc) => {
-          milestones.push({
-            id: crypto.randomUUID(),
-            title: `📄 ${doc.file_name}`,
-            start: doc.created_at.split("T")[0],
-            end: doc.created_at.split("T")[0],
-            order: order++,
-          });
-        });
-      }
-
-      if (plans && plans.length > 0) {
-        plans.forEach((plan) => {
-          milestones.push({
-            id: crypto.randomUUID(),
-            title: `📐 Plano: ${plan.name}`,
-            start: plan.created_at.split("T")[0],
-            end: plan.created_at.split("T")[0],
-            order: order++,
-          });
-        });
-      }
+      // Documents and plans are used to inform the timeline but NOT shown as milestones
 
       saveItems(milestones);
       toast.success(`Diagrama generado con ${milestones.length} hitos`);
