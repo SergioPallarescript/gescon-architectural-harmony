@@ -228,13 +228,7 @@ const ProjectDetail = () => {
           {modules.map((mod, i) => (
             <button
               key={mod.key}
-              onClick={() => {
-                if (mod.key === "plans") navigate(`/project/${id}/plans`);
-                else if (mod.key === "orders") navigate(`/project/${id}/orders`);
-                else if (mod.key === "incidents") navigate(`/project/${id}/incidents`);
-                else if (mod.key === "costs") navigate(`/project/${id}/costs`);
-                else toast.info(`Módulo "${mod.label}" — próximamente`);
-              }}
+              onClick={() => navigate(`/project/${id}/${mod.key}`)}
               className="bg-card border border-border rounded-lg p-5 text-left hover:border-foreground/20 transition-all group animate-fade-in"
               style={{ animationDelay: `${i * 60}ms` }}
             >
