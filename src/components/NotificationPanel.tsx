@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { X, AlertTriangle } from "lucide-react";
@@ -26,6 +27,7 @@ interface NotificationItem {
 }
 
 const NotificationPanel = ({ onClose }: { onClose: () => void }) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [selectedNotif, setSelectedNotif] = useState<NotificationItem | null>(null);
@@ -43,10 +45,28 @@ const NotificationPanel = ({ onClose }: { onClose: () => void }) => {
     fetch();
   }, []);
 
+  const getNotificationRoute = (notif: NotificationItem): string | null => {
+    if (!notif.project_id) return null;
+    const t = notif.title.toLowerCase();
+    if (t.includes("orden")) return `/project/${notif.project_id}/orders`;
+    if (t.includes("plano") || t.includes("versión") || t.includes("version")) return `/project/${notif.project_id}/plans`;
+    if (t.includes("incidencia")) return `/project/${notif.project_id}/incidents`;
+    if (t.includes("gantt") || t.includes("hito")) return `/project/${notif.project_id}/gantt`;
+    if (t.includes("rol") || t.includes("agente") || t.includes("eliminado del proyecto")) return `/project/${notif.project_id}/admin`;
+    if (t.includes("cfo") || t.includes("reclamación") || t.includes("documento")) return `/project/${notif.project_id}/cfo`;
+    return `/project/${notif.project_id}`;
+  };
+
   const handleNotificationClick = (notif: NotificationItem) => {
     if (!notif.is_read) {
       setSelectedNotif(notif);
       setShowAckDialog(true);
+    } else {
+      const route = getNotificationRoute(notif);
+      if (route) {
+        onClose();
+        navigate(route);
+      }
     }
   };
 
@@ -82,8 +102,14 @@ const NotificationPanel = ({ onClose }: { onClose: () => void }) => {
       prev.map((n) => (n.id === selectedNotif.id ? { ...n, is_read: true } : n))
     );
     setShowAckDialog(false);
-    setSelectedNotif(null);
     toast.success("Lectura registrada legalmente");
+
+    const route = getNotificationRoute(selectedNotif);
+    setSelectedNotif(null);
+    if (route) {
+      onClose();
+      navigate(route);
+    }
   };
 
   return (
