@@ -209,7 +209,8 @@ const DWGViewer = () => {
       dwgViewerRef.current = viewer;
 
       const loader = new xViewer.DxfLoader(viewer);
-      const model = await loader.loadAsync(url);
+      const dxfData = await loader.loadAsync(url);
+      const model = new xViewer.Model2d(dxfData as any);
       viewer.addModel(model);
       viewer.viewFitAll();
       viewer.enableRender(0);
