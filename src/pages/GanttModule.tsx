@@ -409,7 +409,9 @@ const GanttModule = () => {
             )}
           </>
         )}
-      </div>
+        </div>
+        </>
+      )}
     </AppLayout>
   );
 };
