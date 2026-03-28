@@ -13,7 +13,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `Eres el "Cerebro de Obra" de GESCON, un asistente inteligente especializado en gestión de obras de construcción en España.
+    const systemPrompt = `Eres el "Cerebro de Obra" de TECTRA, un asistente inteligente especializado en gestión de obras de construcción en España.
 
 REGLA FUNDAMENTAL: Tus respuestas deben basarse ÚNICA Y EXCLUSIVAMENTE en los documentos del proyecto que se te proporcionan en el contexto. NO inventes información. NO uses conocimiento general. Si la información solicitada no está en los documentos disponibles, indica claramente: "Esta información no se encuentra en los documentos del proyecto."
 
