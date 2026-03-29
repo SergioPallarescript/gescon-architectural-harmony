@@ -196,7 +196,7 @@ const BrainModule = () => {
             </Button>
             <div className="flex-1">
               <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">Cerebro de Obra</p>
-              <h1 className="font-display text-lg font-bold tracking-tighter">Consultas basadas en documentos</h1>
+              <h1 className="font-display text-lg font-bold tracking-tighter">Conocimiento acumulativo</h1>
             </div>
             <Button variant="ghost" size="sm" onClick={() => navigate(`/project/${projectId}/docs`)} className="text-xs font-display uppercase tracking-wider gap-1">
               <FileText className="h-3.5 w-3.5" /> Docs ({docNames.length})
@@ -211,8 +211,8 @@ const BrainModule = () => {
               <Brain className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
               <h2 className="font-display text-lg font-semibold text-muted-foreground mb-2">Cerebro de Obra</h2>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Respondo <strong>exclusivamente</strong> basándome en la documentación del proyecto y los planos subidos.
-                Sube documentos desde "Documentación de Proyecto" para alimentar mi conocimiento.
+                Integro <strong>tres fuentes</strong> de conocimiento: documentos del proyecto, historial de órdenes e historial de incidencias.
+                La información más reciente tiene prioridad sobre la original.
               </p>
               {docNames.length > 0 && (
                 <div className="mt-4 p-3 bg-card border border-border rounded-lg max-w-md mx-auto text-left">
@@ -229,8 +229,9 @@ const BrainModule = () => {
               )}
               <div className="flex flex-wrap gap-2 justify-center mt-6">
                 {[
-                  "¿Qué documentos tenemos subidos?",
-                  "Resume los planos del proyecto",
+                  "¿Qué documentos y registros tenemos?",
+                  "Resume las últimas órdenes e incidencias",
+                  "¿Hay contradicciones entre el proyecto y las órdenes?",
                   "¿Qué falta para el cierre de obra?",
                 ].map((q) => (
                   <button key={q} onClick={() => setInput(q)} className="px-3 py-1.5 text-xs border border-border rounded-full hover:border-foreground/20 transition-colors text-muted-foreground hover:text-foreground">
