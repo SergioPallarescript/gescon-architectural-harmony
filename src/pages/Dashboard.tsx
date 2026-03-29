@@ -2,16 +2,13 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import AppLayout from "@/components/AppLayout";
+import ProgressRing from "@/components/ProgressRing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Building2, MapPin, Users } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -31,6 +28,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [newProject, setNewProject] = useState({ name: "", description: "", address: "" });
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [progress, setProgress] = useState<Record<string, number>>({});
   const navigate = useNavigate();
 
   const isAdmin = profile?.role === "DO" || profile?.role === "DEM";
@@ -41,7 +39,32 @@ const Dashboard = () => {
         .from("projects")
         .select("*")
         .order("created_at", { ascending: false });
-      if (data) setProjects(data);
+      if (data) {
+        setProjects(data);
+        // Calculate progress for each project
+        const progressMap: Record<string, number> = {};
+        for (const project of data) {
+          const [{ data: milestones }, { data: orders }] = await Promise.all([
+            supabase.from("gantt_milestones").select("start_date, end_date").eq("project_id", project.id),
+            supabase.from("orders").select("id").eq("project_id", project.id),
+          ]);
+          if (milestones && milestones.length > 0) {
+            const today = new Date();
+            const allDates = milestones.flatMap((m: any) => [new Date(m.start_date), new Date(m.end_date)]);
+            const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
+            const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+            const totalSpan = maxDate.getTime() - minDate.getTime();
+            const elapsed = today.getTime() - minDate.getTime();
+            const ganttPercent = totalSpan > 0 ? Math.min(100, Math.max(0, (elapsed / totalSpan) * 100)) : 0;
+            // Mix with order activity as a modifier (more orders = more progress confidence)
+            const orderFactor = Math.min(1, (orders?.length || 0) / Math.max(1, milestones.length * 2));
+            progressMap[project.id] = Math.round(ganttPercent * (0.7 + 0.3 * orderFactor));
+          } else {
+            progressMap[project.id] = 0;
+          }
+        }
+        setProgress(progressMap);
+      }
       setLoading(false);
     };
     fetchProjects();
@@ -62,10 +85,7 @@ const Dashboard = () => {
       .select()
       .single();
 
-    if (error) {
-      toast.error("Error al crear el proyecto");
-      return;
-    }
+    if (error) { toast.error("Error al crear el proyecto"); return; }
 
     await supabase.from("project_members").insert({
       project_id: data.id,
@@ -94,9 +114,7 @@ const Dashboard = () => {
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">
-              Bienvenido
-            </p>
+            <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">Bienvenido</p>
             <h1 className="font-display text-3xl font-bold tracking-tighter mt-1">
               {profile?.full_name || "Panel Principal"}
             </h1>
@@ -106,8 +124,7 @@ const Dashboard = () => {
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="font-display text-xs uppercase tracking-wider gap-2">
-                  <Plus className="h-4 w-4" />
-                  Nuevo Proyecto
+                  <Plus className="h-4 w-4" />Nuevo Proyecto
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -116,39 +133,18 @@ const Dashboard = () => {
                 </DialogHeader>
                 <form onSubmit={handleCreateProject} className="space-y-4 mt-4">
                   <div className="space-y-2">
-                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">
-                      Nombre del Proyecto
-                    </Label>
-                    <Input
-                      value={newProject.name}
-                      onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                      placeholder="Edificio Residencial Norte"
-                      required
-                    />
+                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Nombre del Proyecto</Label>
+                    <Input value={newProject.name} onChange={(e) => setNewProject({ ...newProject, name: e.target.value })} placeholder="Edificio Residencial Norte" required />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">
-                      Descripción
-                    </Label>
-                    <Input
-                      value={newProject.description}
-                      onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                      placeholder="40 viviendas, 3 plantas + sótano"
-                    />
+                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Descripción</Label>
+                    <Input value={newProject.description} onChange={(e) => setNewProject({ ...newProject, description: e.target.value })} placeholder="40 viviendas, 3 plantas + sótano" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">
-                      Dirección
-                    </Label>
-                    <Input
-                      value={newProject.address}
-                      onChange={(e) => setNewProject({ ...newProject, address: e.target.value })}
-                      placeholder="Calle Mayor 12, Madrid"
-                    />
+                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Dirección</Label>
+                    <Input value={newProject.address} onChange={(e) => setNewProject({ ...newProject, address: e.target.value })} placeholder="Calle Mayor 12, Madrid" />
                   </div>
-                  <Button type="submit" className="w-full font-display text-xs uppercase tracking-wider">
-                    Crear Proyecto
-                  </Button>
+                  <Button type="submit" className="w-full font-display text-xs uppercase tracking-wider">Crear Proyecto</Button>
                 </form>
               </DialogContent>
             </Dialog>
@@ -178,35 +174,30 @@ const Dashboard = () => {
                 style={{ animationDelay: `${i * 80}ms` }}
               >
                 <div className="flex items-start justify-between">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-display text-lg font-semibold tracking-tight group-hover:text-foreground transition-colors">
                       {project.name}
                     </h3>
                     {project.description && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {project.description}
-                      </p>
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
                     )}
                   </div>
-                  <span className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-widest rounded ${
-                    project.status === "active"
-                      ? "bg-success/10 text-success"
-                      : "bg-secondary text-muted-foreground"
-                  }`}>
-                    {project.status === "active" ? "Activo" : project.status}
-                  </span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {(progress[project.id] ?? 0) > 0 && (
+                      <ProgressRing percent={progress[project.id] || 0} />
+                    )}
+                    <span className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-widest rounded ${
+                      project.status === "active" ? "bg-success/10 text-success" : "bg-secondary text-muted-foreground"
+                    }`}>
+                      {project.status === "active" ? "Activo" : project.status}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
                   {project.address && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {project.address}
-                    </span>
+                    <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{project.address}</span>
                   )}
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    Equipo
-                  </span>
+                  <span className="flex items-center gap-1"><Users className="h-3 w-3" />Equipo</span>
                 </div>
               </button>
             ))}

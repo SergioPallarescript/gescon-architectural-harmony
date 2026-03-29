@@ -22,23 +22,10 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  FileText,
-  Brain,
-  BookOpen,
-  AlertTriangle,
-  DollarSign,
-  Ruler,
-  ClipboardCheck,
-  UserPlus,
-  ArrowLeft,
-  Users,
-  Share2,
-  Copy,
-  MessageCircle,
-  FolderOpen,
-  BarChart3,
-  Shield,
+  FileText, Brain, BookOpen, AlertTriangle, DollarSign, Ruler, ClipboardCheck,
+  UserPlus, ArrowLeft, Users, Share2, Copy, MessageCircle, FolderOpen, BarChart3, Shield,
 } from "lucide-react";
+import DailyBriefing from "@/components/DailyBriefing";
 
 type AppRole = "DO" | "DEM" | "CON" | "PRO" | "CSS";
 
@@ -356,6 +343,11 @@ const ProjectDetail = () => {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Daily Briefing */}
+        <div className="mb-8">
+          <DailyBriefing projectId={id!} projectAddress={project.address} />
         </div>
 
         {/* Modules Grid */}
