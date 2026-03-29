@@ -107,6 +107,10 @@ const OrdersModule = () => {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId || !user) return;
+
+    // Check cross-alerts before submitting
+    await checkCrossAlerts(content);
+
     setSubmitting(true);
     const photoUrls: string[] = [];
     for (const photo of photos) {
@@ -138,7 +142,7 @@ const OrdersModule = () => {
       message: `Se ha registrado una nueva orden en el Libro de Órdenes`,
       type: requiresValidation ? "warning" : "info",
     });
-    setContent(""); setPhotos([]); setCreateOpen(false); setSubmitting(false); fetchOrders();
+    setContent(""); setPhotos([]); setStructuredSections(null); setCreateOpen(false); setSubmitting(false); fetchOrders();
   };
 
   const handleEdit = async (e: React.FormEvent) => {
