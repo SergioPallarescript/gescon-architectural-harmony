@@ -420,6 +420,7 @@ const OrdersModule = () => {
               </DialogContent>
             </Dialog>
           )}
+          </div>
         </div>
 
         {loading ? (
