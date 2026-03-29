@@ -561,7 +561,7 @@ const OrdersModule = () => {
                       )}
                       {isOwner && (
                         <>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditOrder(order); setEditContent(order.content); }} className="gap-1 text-xs text-muted-foreground">
+                          <Button size="sm" variant="ghost" onClick={() => { setEditOrder(order); setEditContent(order.content); setEditPhotos([]); setEditRemovedPhotos([]); setEditStructuredSections(null); }} className="gap-1 text-xs text-muted-foreground">
                             <Pencil className="h-3.5 w-3.5" /> Editar
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => setDeleteOrderId(order.id)} className="gap-1 text-xs text-destructive">

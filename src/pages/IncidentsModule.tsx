@@ -409,7 +409,7 @@ const IncidentsModule = () => {
                     </div>
                     {isOwner && (
                       <div className="flex flex-col gap-1 shrink-0">
-                        <Button size="sm" variant="ghost" onClick={() => { setEditIncident(inc); setEditContent(inc.content); setEditSeverity(inc.severity); setEditRemedial(inc.remedial_actions || ""); }} className="gap-1 text-xs text-muted-foreground">
+                        <Button size="sm" variant="ghost" onClick={() => { setEditIncident(inc); setEditContent(inc.content); setEditSeverity(inc.severity); setEditRemedial(inc.remedial_actions || ""); setEditPhotos([]); setEditRemovedPhotos([]); }} className="gap-1 text-xs text-muted-foreground">
                           <Pencil className="h-3.5 w-3.5" /> Editar
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setDeleteIncidentId(inc.id)} className="gap-1 text-xs text-destructive">
