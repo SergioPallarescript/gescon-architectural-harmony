@@ -17,12 +17,12 @@ const corsHeaders = {
 }
 
 const EMAIL_SUBJECTS: Record<string, string> = {
-  signup: 'Confirm your email',
-  invite: "You've been invited",
-  magiclink: 'Your login link',
-  recovery: 'Reset your password',
-  email_change: 'Confirm your new email',
-  reauthentication: 'Your verification code',
+  signup: '🏗️ Confirma tu acceso - TEKTRA',
+  invite: '🏗️ Invitación al Proyecto de Obra - TEKTRA',
+  magiclink: '🔐 Tu enlace de acceso - TEKTRA',
+  recovery: '🔑 Restablecer contraseña - TEKTRA',
+  email_change: '📧 Confirma el cambio de correo - TEKTRA',
+  reauthentication: '🔒 Código de verificación - TEKTRA',
 }
 
 // Template mapping
@@ -36,7 +36,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "gescon-legal-flow"
+const SITE_NAME = "TEKTRA"
 const SENDER_DOMAIN = "notify.tektra.es"
 const ROOT_DOMAIN = "tektra.es"
 const FROM_DOMAIN = "tektra.es" // Domain shown in From address (may be root or sender subdomain)
