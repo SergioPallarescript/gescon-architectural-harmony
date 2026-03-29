@@ -331,7 +331,7 @@ const OrdersModule = () => {
                 {exporting ? "Exportando..." : "Exportar Libro (.docx)"}
               </Button>
             )}
-          {canWrite && (
+            {canWrite && (
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
                 <Button className="font-display text-xs uppercase tracking-wider gap-2"><Plus className="h-4 w-4" />Nueva Orden</Button>
