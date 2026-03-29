@@ -411,7 +411,22 @@ const OrdersModule = () => {
                           <span className="px-2 py-0.5 text-[10px] font-display uppercase tracking-widest bg-warning/10 text-warning rounded">Requiere validación</span>
                         )}
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{order.content}</p>
+                      {order.content.includes("**ESTADO DE LA OBRA:**") ? (
+                        <div className="space-y-2 mt-1">
+                          {order.content.split(/\*\*(?:ESTADO DE LA OBRA|INSTRUCCIONES Y ÓRDENES|PENDIENTES):\*\*/).filter(Boolean).map((section: string, si: number) => {
+                            const titles = ["Estado de la Obra", "Instrucciones y Órdenes", "Pendientes"];
+                            const colors = ["text-emerald-600 dark:text-emerald-400", "text-blue-600 dark:text-blue-400", "text-amber-600 dark:text-amber-400"];
+                            return (
+                              <div key={si} className="p-2.5 bg-secondary/20 rounded border border-border">
+                                <p className={`text-[10px] font-display font-bold uppercase tracking-wider mb-0.5 ${colors[si] || "text-primary"}`}>{titles[si] || ""}</p>
+                                <p className="text-sm whitespace-pre-wrap">{section.trim()}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap">{order.content}</p>
+                      )}
                       {order.photos && order.photos.length > 0 && (
                         <AttachmentThumbnails paths={order.photos} />
                       )}
