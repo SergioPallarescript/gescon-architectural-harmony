@@ -215,15 +215,42 @@ const OrdersModule = () => {
     setCleaning(true);
     try {
       const { data, error } = await supabase.functions.invoke("clean-dictation", {
-        body: { rawText, context: "orders" },
+        body: { rawText, context: "orders", structured: true },
       });
       if (error) throw error;
-      setContent(data.cleanedText || rawText);
-      toast.success("Dictado procesado por IA — revisa el texto antes de guardar");
+      if (data.structured && data.sections) {
+        setStructuredSections(data.sections);
+        const combined = `**ESTADO DE LA OBRA:**\n${data.sections.estado}\n\n**INSTRUCCIONES Y ÓRDENES:**\n${data.sections.instrucciones}\n\n**PENDIENTES:**\n${data.sections.pendientes}`;
+        setContent(combined);
+        toast.success("Dictado estructurado por IA en 3 secciones — revisa antes de guardar");
+      } else {
+        setContent(data.cleanedText || rawText);
+        toast.success("Dictado procesado por IA — revisa el texto antes de guardar");
+      }
     } catch {
       toast.error("Error al procesar el dictado, se mantiene el texto original");
     } finally {
       setCleaning(false);
+    }
+  };
+
+  // Cross-alert: check if content mentions elements with open incidents
+  const checkCrossAlerts = async (text: string) => {
+    if (!projectId) return;
+    const { data: openIncidents } = await supabase
+      .from("incidents")
+      .select("*")
+      .eq("project_id", projectId)
+      .eq("status", "open");
+    if (!openIncidents || openIncidents.length === 0) return;
+
+    const lower = text.toLowerCase();
+    const matching = openIncidents.filter((inc: any) => {
+      const words = inc.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 4);
+      return words.some((word: string) => lower.includes(word));
+    });
+    if (matching.length > 0) {
+      setCrossAlert({ show: true, incidents: matching });
     }
   };
 
