@@ -308,7 +308,26 @@ const OrdersModule = () => {
                         {cleaning ? <><span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Procesando...</> : recording ? <><MicOff className="h-3 w-3" /> Parar</> : <><Mic className="h-3 w-3" /> Dictar</>}
                       </Button>
                     </div>
-                    <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Describa la orden de obra..." rows={6} required />
+                    <Textarea value={content} onChange={(e) => { setContent(e.target.value); setStructuredSections(null); }} placeholder="Describa la orden de obra..." rows={6} required />
+                    {structuredSections && (
+                      <div className="space-y-2 mt-2 p-3 bg-secondary/30 rounded-lg border border-border">
+                        <p className="text-[10px] font-display uppercase tracking-widest text-muted-foreground mb-1">Vista previa estructurada por IA</p>
+                        <div className="space-y-1.5">
+                          <div className="p-2 bg-background rounded border border-border">
+                            <p className="text-[10px] font-display font-bold uppercase tracking-wider text-primary mb-0.5">Estado de la Obra</p>
+                            <p className="text-xs">{structuredSections.estado}</p>
+                          </div>
+                          <div className="p-2 bg-background rounded border border-border">
+                            <p className="text-[10px] font-display font-bold uppercase tracking-wider text-primary mb-0.5">Instrucciones y Órdenes</p>
+                            <p className="text-xs">{structuredSections.instrucciones}</p>
+                          </div>
+                          <div className="p-2 bg-background rounded border border-border">
+                            <p className="text-[10px] font-display font-bold uppercase tracking-wider text-primary mb-0.5">Pendientes</p>
+                            <p className="text-xs">{structuredSections.pendientes}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {content && detectChanges(content).length > 0 && (
                       <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 px-3 py-2 rounded">
                         <AlertTriangle className="h-3.5 w-3.5" />
