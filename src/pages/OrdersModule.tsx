@@ -42,6 +42,8 @@ const OrdersModule = () => {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
   const [cleaning, setCleaning] = useState(false);
+  const [structuredSections, setStructuredSections] = useState<{ estado: string; instrucciones: string; pendientes: string } | null>(null);
+  const [crossAlert, setCrossAlert] = useState<{ show: boolean; incidents: any[] }>({ show: false, incidents: [] });
   const recognitionRef = useRef<any>(null);
 
   const isDEM = profile?.role === "DEM";
@@ -105,6 +107,10 @@ const OrdersModule = () => {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId || !user) return;
+
+    // Check cross-alerts before submitting
+    await checkCrossAlerts(content);
+
     setSubmitting(true);
     const photoUrls: string[] = [];
     for (const photo of photos) {
@@ -136,7 +142,7 @@ const OrdersModule = () => {
       message: `Se ha registrado una nueva orden en el Libro de Órdenes`,
       type: requiresValidation ? "warning" : "info",
     });
-    setContent(""); setPhotos([]); setCreateOpen(false); setSubmitting(false); fetchOrders();
+    setContent(""); setPhotos([]); setStructuredSections(null); setCreateOpen(false); setSubmitting(false); fetchOrders();
   };
 
   const handleEdit = async (e: React.FormEvent) => {
@@ -213,15 +219,42 @@ const OrdersModule = () => {
     setCleaning(true);
     try {
       const { data, error } = await supabase.functions.invoke("clean-dictation", {
-        body: { rawText, context: "orders" },
+        body: { rawText, context: "orders", structured: true },
       });
       if (error) throw error;
-      setContent(data.cleanedText || rawText);
-      toast.success("Dictado procesado por IA — revisa el texto antes de guardar");
+      if (data.structured && data.sections) {
+        setStructuredSections(data.sections);
+        const combined = `**ESTADO DE LA OBRA:**\n${data.sections.estado}\n\n**INSTRUCCIONES Y ÓRDENES:**\n${data.sections.instrucciones}\n\n**PENDIENTES:**\n${data.sections.pendientes}`;
+        setContent(combined);
+        toast.success("Dictado estructurado por IA en 3 secciones — revisa antes de guardar");
+      } else {
+        setContent(data.cleanedText || rawText);
+        toast.success("Dictado procesado por IA — revisa el texto antes de guardar");
+      }
     } catch {
       toast.error("Error al procesar el dictado, se mantiene el texto original");
     } finally {
       setCleaning(false);
+    }
+  };
+
+  // Cross-alert: check if content mentions elements with open incidents
+  const checkCrossAlerts = async (text: string) => {
+    if (!projectId) return;
+    const { data: openIncidents } = await supabase
+      .from("incidents")
+      .select("*")
+      .eq("project_id", projectId)
+      .eq("status", "open");
+    if (!openIncidents || openIncidents.length === 0) return;
+
+    const lower = text.toLowerCase();
+    const matching = openIncidents.filter((inc: any) => {
+      const words = inc.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 4);
+      return words.some((word: string) => lower.includes(word));
+    });
+    if (matching.length > 0) {
+      setCrossAlert({ show: true, incidents: matching });
     }
   };
 
@@ -279,7 +312,26 @@ const OrdersModule = () => {
                         {cleaning ? <><span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Procesando...</> : recording ? <><MicOff className="h-3 w-3" /> Parar</> : <><Mic className="h-3 w-3" /> Dictar</>}
                       </Button>
                     </div>
-                    <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Describa la orden de obra..." rows={6} required />
+                    <Textarea value={content} onChange={(e) => { setContent(e.target.value); setStructuredSections(null); }} placeholder="Describa la orden de obra..." rows={6} required />
+                    {structuredSections && (
+                      <div className="space-y-2 mt-2 p-3 bg-secondary/30 rounded-lg border border-border">
+                        <p className="text-[10px] font-display uppercase tracking-widest text-muted-foreground mb-1">Vista previa estructurada por IA</p>
+                        <div className="space-y-1.5">
+                          <div className="p-2 bg-background rounded border border-border">
+                            <p className="text-[10px] font-display font-bold uppercase tracking-wider text-primary mb-0.5">Estado de la Obra</p>
+                            <p className="text-xs">{structuredSections.estado}</p>
+                          </div>
+                          <div className="p-2 bg-background rounded border border-border">
+                            <p className="text-[10px] font-display font-bold uppercase tracking-wider text-primary mb-0.5">Instrucciones y Órdenes</p>
+                            <p className="text-xs">{structuredSections.instrucciones}</p>
+                          </div>
+                          <div className="p-2 bg-background rounded border border-border">
+                            <p className="text-[10px] font-display font-bold uppercase tracking-wider text-primary mb-0.5">Pendientes</p>
+                            <p className="text-xs">{structuredSections.pendientes}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {content && detectChanges(content).length > 0 && (
                       <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 px-3 py-2 rounded">
                         <AlertTriangle className="h-3.5 w-3.5" />
@@ -359,7 +411,22 @@ const OrdersModule = () => {
                           <span className="px-2 py-0.5 text-[10px] font-display uppercase tracking-widest bg-warning/10 text-warning rounded">Requiere validación</span>
                         )}
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{order.content}</p>
+                      {order.content.includes("**ESTADO DE LA OBRA:**") ? (
+                        <div className="space-y-2 mt-1">
+                          {order.content.split(/\*\*(?:ESTADO DE LA OBRA|INSTRUCCIONES Y ÓRDENES|PENDIENTES):\*\*/).filter(Boolean).map((section: string, si: number) => {
+                            const titles = ["Estado de la Obra", "Instrucciones y Órdenes", "Pendientes"];
+                            const colors = ["text-emerald-600 dark:text-emerald-400", "text-blue-600 dark:text-blue-400", "text-amber-600 dark:text-amber-400"];
+                            return (
+                              <div key={si} className="p-2.5 bg-secondary/20 rounded border border-border">
+                                <p className={`text-[10px] font-display font-bold uppercase tracking-wider mb-0.5 ${colors[si] || "text-primary"}`}>{titles[si] || ""}</p>
+                                <p className="text-sm whitespace-pre-wrap">{section.trim()}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap">{order.content}</p>
+                      )}
                       {order.photos && order.photos.length > 0 && (
                         <AttachmentThumbnails paths={order.photos} />
                       )}
@@ -445,6 +512,34 @@ const OrdersModule = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cross-alert: incidents related to order content */}
+      <AlertDialog open={crossAlert.show} onOpenChange={(open) => { if (!open) setCrossAlert({ show: false, incidents: [] }); }}>
+        <AlertDialogContent className="border-destructive">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" /> Alerta de Coherencia Cruzada
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Esta orden hace referencia a elementos que tienen <strong>incidencias de seguridad abiertas</strong> en el Libro de Incidencias:</p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {crossAlert.incidents.map((inc: any) => (
+                    <div key={inc.id} className="p-2 bg-destructive/10 rounded text-xs border border-destructive/20">
+                      <span className="font-bold">#{inc.incident_number}</span> — {inc.content.substring(0, 120)}...
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs font-medium">¿Deseas continuar con el registro de la orden?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setCrossAlert({ show: false, incidents: [] }); setSubmitting(false); }}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => setCrossAlert({ show: false, incidents: [] })} className="bg-destructive text-destructive-foreground">Continuar de todos modos</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
