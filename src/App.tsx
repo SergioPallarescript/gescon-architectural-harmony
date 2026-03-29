@@ -1,9 +1,12 @@
+import { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import LegalGateModal from "@/components/LegalGateModal";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -24,7 +27,21 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { session, loading } = useAuth();
+  const { session, user, loading } = useAuth();
+  const [termsAccepted, setTermsAccepted] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user) { setTermsAccepted(null); return; }
+    supabase
+      .from("profiles")
+      .select("terms_accepted_at")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        setTermsAccepted(!!(data as any)?.terms_accepted_at);
+      });
+  }, [user]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background concrete-bg relative">
@@ -35,7 +52,34 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   }
-  return session ? <>{children}</> : <Navigate to="/auth" replace />;
+
+  if (!session) return <Navigate to="/auth" replace />;
+
+  if (termsAccepted === false) {
+    return (
+      <>
+        <LegalGateModal open onAccept={() => setTermsAccepted(true)} />
+        <div className="min-h-screen flex items-center justify-center bg-background concrete-bg relative">
+          <div className="relative z-10 text-center">
+            <img src="/tectra-logo.png" alt="TEKTRA" className="h-8 mx-auto" />
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (termsAccepted === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background concrete-bg relative">
+        <div className="relative z-10 text-center">
+          <img src="/tectra-logo.png" alt="TEKTRA" className="h-8 mx-auto" />
+          <div className="mt-4 h-6 w-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
