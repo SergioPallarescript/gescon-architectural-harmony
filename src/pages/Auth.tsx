@@ -74,7 +74,7 @@ const Auth = () => {
       <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: 'url(/login-bg.jpg)', opacity: 0.15 }} />
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="mb-12 text-center">
-          <img src="/tectra-logo.png" alt="TECTRA" className="h-12 mx-auto brightness-0 invert" />
+          <img src="/tectra-logo.png" alt="TEKTRA" className="h-12 mx-auto brightness-0 invert" />
           <p className="mt-3 text-sm text-white/50 uppercase tracking-[0.2em]">
             Gestión de Construcción
           </p>

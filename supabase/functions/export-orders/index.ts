@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     const memberProfileMap: Record<string, any> = {};
     (memberProfiles || []).forEach((p: any) => { memberProfileMap[p.user_id] = p; });
 
-    // Fetch TECTRA logo
+    // Fetch TEKTRA logo
     let logoBase64 = "";
     try {
       const { data: logoData } = await supabase.storage.from("plans").download("tectra-logo.png");
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       <h1 style="margin:0;font-size:22px;letter-spacing:-0.02em;">LIBRO DE ÓRDENES</h1>
       <p style="margin:4px 0 0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.1em;">Certificado Final de Obra</p>
     </div>
-    ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" style="height:36px;" />` : '<span style="font-size:18px;font-weight:bold;">TECTRA</span>'}
+    ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" style="height:36px;" />` : '<span style="font-size:18px;font-weight:bold;">TEKTRA</span>'}
   </div>
 
   <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
 
   <div style="margin-top:48px;border-top:1px solid #e5e7eb;padding-top:16px;">
     <p style="font-size:9px;color:#9ca3af;text-align:center;">
-      Documento generado automáticamente por TECTRA — ${today}. Este documento forma parte del Certificado Final de Obra.
+      Documento generado automáticamente por TEKTRA — ${today}. Este documento forma parte del Certificado Final de Obra.
     </p>
   </div>
 </body>

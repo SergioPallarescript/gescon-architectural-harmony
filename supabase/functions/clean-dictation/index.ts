@@ -16,7 +16,7 @@ serve(async (req) => {
     let systemPrompt: string;
 
     if (structured && context === "orders") {
-      systemPrompt = `Eres un asistente de post-procesamiento de dictado de voz para la plataforma TECTRA de gestión de obras de construcción en España.
+      systemPrompt = `Eres un asistente de post-procesamiento de dictado de voz para la plataforma TEKTRA de gestión de obras de construcción en España.
 
 Tu tarea es limpiar y estructurar el texto dictado por voz en EXACTAMENTE tres secciones. Sigue estas reglas:
 
@@ -37,7 +37,7 @@ DEVUELVE ÚNICAMENTE un JSON válido con esta estructura exacta (sin markdown, s
 Si alguna sección no tiene contenido relevante del dictado, déjala con un texto breve indicándolo: "Sin observaciones en esta visita."
 IMPORTANTE: Devuelve SOLO el JSON, sin texto adicional, sin bloques de código.`;
     } else {
-      systemPrompt = `Eres un asistente de post-procesamiento de dictado de voz para la plataforma TECTRA de gestión de obras de construcción en España.
+      systemPrompt = `Eres un asistente de post-procesamiento de dictado de voz para la plataforma TEKTRA de gestión de obras de construcción en España.
 
 Tu tarea es limpiar y reescribir el texto dictado por voz siguiendo estas reglas estrictas:
 
