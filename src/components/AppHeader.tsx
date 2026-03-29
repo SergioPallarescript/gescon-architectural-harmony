@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Bell, Menu, X, LogOut, FolderOpen, Settings, BellRing, BellOff } from "lucide-react";
+import { Bell, Menu, X, LogOut, FolderOpen, Settings, BellRing, BellOff, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useNavigate, useLocation } from "react-router-dom";
 import NotificationPanel from "./NotificationPanel";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
+import { useTheme } from "@/hooks/useTheme";
 import { toast } from "sonner";
 
 const AppHeader = () => {
   const { profile, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const navigate = useNavigate();
@@ -66,7 +68,7 @@ const AppHeader = () => {
           </SheetTrigger>
           <SheetContent side="left" className="w-72 bg-card p-0">
             <div className="p-6 border-b border-border">
-              <img src="/tectra-logo.png" alt="TECTRA" className="h-6" />
+              <img src="/tectra-logo.png" alt="TECTRA" className="h-6 dark:brightness-0 dark:invert" />
               <p className="text-xs text-muted-foreground font-display uppercase tracking-wider mt-1">
                 {profile?.full_name || "Usuario"}
               </p>
@@ -107,6 +109,19 @@ const AppHeader = () => {
                 </Button>
               </div>
             )}
+            <div className="px-4 mt-2">
+              <Button
+                variant="outline"
+                onClick={toggleTheme}
+                className="w-full justify-start gap-2 text-sm"
+              >
+                {theme === "dark" ? (
+                  <><Sun className="h-4 w-4" /> Modo Claro</>
+                ) : (
+                  <><Moon className="h-4 w-4" /> Modo Oscuro</>
+                )}
+              </Button>
+            </div>
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border">
               <Button
                 variant="ghost"
@@ -122,7 +137,7 @@ const AppHeader = () => {
 
         {/* Center: Logo */}
         <button onClick={() => navigate("/")} className="flex items-center">
-          <img src="/tectra-logo.png" alt="TECTRA" className="h-6" />
+          <img src="/tectra-logo.png" alt="TECTRA" className="h-6 dark:brightness-0 dark:invert" />
         </button>
 
         {/* Right: Notifications */}
