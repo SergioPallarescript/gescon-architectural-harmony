@@ -91,7 +91,7 @@ const PlansModule = () => {
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
   const [deletePlanSubmitting, setDeletePlanSubmitting] = useState(false);
 
-  const { isAdmin } = useProjectRole(projectId);
+  const { isAdmin, projectRole } = useProjectRole(projectId);
 
   const fetchPlans = useCallback(async () => {
     if (!projectId) return;
