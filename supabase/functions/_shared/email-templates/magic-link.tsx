@@ -23,21 +23,23 @@ export const MagicLinkEmail = ({
   confirmationUrl,
 }: MagicLinkEmailProps) => (
   <Html lang="es" dir="ltr">
-    <Head />
+    <Head>
+      <meta charSet="utf-8" />
+    </Head>
     <Preview>Tu enlace de acceso a TEKTRA</Preview>
     <Body style={main}>
       <Container style={container}>
         <Heading style={h1}>Tu enlace de acceso</Heading>
         <Text style={text}>
-          Pulsa el botón inferior para acceder a TEKTRA. Este enlace expirará en breve.
+          Haz clic en el bot&oacute;n inferior para acceder a TEKTRA. Este enlace caducar&aacute; en breve.
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Acceder
+          Acceder a TEKTRA
         </Button>
         <Text style={footer}>
-          Si no solicitaste este enlace, puedes ignorar este correo de forma segura.
+          Si no has solicitado este enlace, puedes ignorar este mensaje.
         </Text>
-        <Text style={brand}>TEKTRA — Dirección y Ejecución de Obra Profesional</Text>
+        <Text style={brand}>TEKTRA &mdash; Direcci&oacute;n y Ejecuci&oacute;n de Obra Profesional</Text>
       </Container>
     </Body>
   </Html>
