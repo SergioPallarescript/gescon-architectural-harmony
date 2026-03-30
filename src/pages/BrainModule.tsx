@@ -16,7 +16,7 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/brain-chat`;
 
 const BrainModule = () => {
   const { id: projectId } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
 
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -153,7 +153,7 @@ const BrainModule = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${session?.access_token || ""}`,
         },
         body: JSON.stringify({
           messages: [...messages, userMsg],
