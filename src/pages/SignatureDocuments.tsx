@@ -175,6 +175,14 @@ const SignatureDocuments = () => {
         user_id: user.id, project_id: projectId, action: "signature_document_created",
         details: { title: title.trim(), recipient_id: recipientId, file_name: file.name },
       });
+      // Notify recipient about pending signature
+      await notifyUser({
+        userId: recipientId,
+        projectId: projectId!,
+        title: "Firma pendiente",
+        message: `Tienes un nuevo documento para firmar: "${title.trim()}"`,
+        type: "signature",
+      });
       setTitle(""); setRecipientId(""); setFile(null);
       toast.success("Documento enviado para firma");
       await fetchDocuments();
