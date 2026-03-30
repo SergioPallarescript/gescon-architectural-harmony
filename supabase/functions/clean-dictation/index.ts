@@ -15,7 +15,7 @@ serve(async (req) => {
 
     let systemPrompt: string;
 
-    if (structured && context === "orders") {
+    if (structured && (context === "orders" || context === "incidents")) {
       systemPrompt = `Eres un asistente de post-procesamiento de dictado de voz para la plataforma TEKTRA de gestión de obras de construcción en España.
 
 Tu tarea es limpiar y estructurar el texto dictado por voz en EXACTAMENTE tres secciones. Sigue estas reglas:
@@ -88,7 +88,7 @@ IMPORTANTE: Devuelve ÚNICAMENTE el texto limpio y reestructurado, sin explicaci
     const data = await response.json();
     const rawOutput = data.choices?.[0]?.message?.content?.trim() || rawText;
 
-    if (structured && context === "orders") {
+    if (structured && (context === "orders" || context === "incidents")) {
       try {
         // Try to parse as JSON
         const cleaned = rawOutput.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
