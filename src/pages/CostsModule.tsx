@@ -14,9 +14,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Plus, DollarSign, CheckCircle2, XCircle, Clock, Upload, FileText,
+  ArrowLeft, Plus, DollarSign, CheckCircle2, XCircle, Clock, Upload, FileText, Pencil, Trash2, Eye,
 } from "lucide-react";
 
 const statusLabels: Record<string, { label: string; color: string }> = {
@@ -37,10 +40,17 @@ const CostsModule = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [docType, setDocType] = useState<"certificacion" | "presupuesto">("certificacion");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actionClaim, setActionClaim] = useState<{ id: string; action: string } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [editClaim, setEditClaim] = useState<any | null>(null);
+  const [editData, setEditData] = useState({ title: "", description: "", amount: "" });
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [deleteClaim, setDeleteClaim] = useState<string | null>(null);
 
   const isCON = profile?.role === "CON";
   const isDO = profile?.role === "DO";
