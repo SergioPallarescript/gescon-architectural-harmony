@@ -482,7 +482,7 @@ const PlansModule = () => {
                   <h2 className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4" />Conformidad — Versión {latestVersion.version_number}
                   </h2>
-                  {!userHasSigned && profile?.role && (
+                  {!userHasSigned && projectRole && (
                     <Button onClick={() => setShowConfirmDialog(true)} className="font-display text-xs uppercase tracking-wider gap-2 bg-success hover:bg-success/90 text-success-foreground">
                       <CheckCircle2 className="h-4 w-4" />Confirmar Conformidad
                     </Button>
@@ -595,7 +595,7 @@ const PlansModule = () => {
             <AlertDialogDescription className="text-sm space-y-2">
               <p>Al confirmar, está declarando digitalmente su conformidad con la versión <strong>{latestVersion?.version_number}</strong> del plano <strong>{selectedPlan?.name}</strong>.</p>
               <p>Se registrarán su identidad, marca de tiempo y ubicación geográfica como firma digital legalmente vinculante.</p>
-              <p className="text-muted-foreground italic">Rol: {profile?.role} — {roleLabels[profile?.role || ""] || profile?.role}</p>
+              <p className="text-muted-foreground italic">Rol: {projectRole} — {roleLabels[projectRole || ""] || projectRole}</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
