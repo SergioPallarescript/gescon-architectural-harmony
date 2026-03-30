@@ -93,7 +93,6 @@ Deno.serve(async (req) => {
           <div style="font-size:11px;line-height:1.6;">${contentHtml}</div>
           <div style="margin-top:8px;font-size:10px;color:#9ca3af;">
             Registrada por: ${author?.full_name || "—"} (${author?.role || "—"})
-            ${order.requires_validation ? ' · <span style="color:#f59e0b;">Requiere validación</span>' : ""}
           </div>
         </div>
       `;
