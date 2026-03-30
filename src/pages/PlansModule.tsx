@@ -90,7 +90,7 @@ const PlansModule = () => {
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
   const [deletePlanSubmitting, setDeletePlanSubmitting] = useState(false);
 
-  const isAdmin = profile?.role === "DO" || profile?.role === "DEM";
+  // Will be overridden below after useProjectRole import
 
   const fetchPlans = useCallback(async () => {
     if (!projectId) return;
