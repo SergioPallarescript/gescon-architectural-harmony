@@ -22,22 +22,22 @@ export const MagicLinkEmail = ({
   siteName,
   confirmationUrl,
 }: MagicLinkEmailProps) => (
-  <Html lang="es" dir="ltr">
+  <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Tu enlace de acceso a TEKTRA</Preview>
+    <Preview>Your login link for {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Tu enlace de acceso</Heading>
+        <Heading style={h1}>Your login link</Heading>
         <Text style={text}>
-          Pulsa el botón inferior para acceder a TEKTRA. Este enlace expirará en breve.
+          Click the button below to log in to {siteName}. This link will expire
+          shortly.
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Acceder
+          Log In
         </Button>
         <Text style={footer}>
-          Si no solicitaste este enlace, puedes ignorar este correo de forma segura.
+          If you didn't request this link, you can safely ignore this email.
         </Text>
-        <Text style={brand}>TEKTRA — Dirección y Ejecución de Obra Profesional</Text>
       </Container>
     </Body>
   </Html>
@@ -45,7 +45,7 @@ export const MagicLinkEmail = ({
 
 export default MagicLinkEmail
 
-const main = { backgroundColor: '#ffffff', fontFamily: "'Montserrat', Arial, sans-serif" }
+const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }
 const container = { padding: '20px 25px' }
 const h1 = {
   fontSize: '22px',
@@ -68,4 +68,3 @@ const button = {
   textDecoration: 'none',
 }
 const footer = { fontSize: '12px', color: '#999999', margin: '30px 0 0' }
-const brand = { fontSize: '10px', color: '#bbbbbb', margin: '10px 0 0', textAlign: 'center' as const }
