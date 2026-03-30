@@ -183,18 +183,45 @@ const CostsModule = () => {
         technical_approved_at: new Date().toISOString(),
       }).eq("id", id);
       toast.success("Validación técnica registrada");
+      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type").eq("id", id).single();
+      const dt = claim?.doc_type === "presupuesto" ? "Presupuesto" : "Certificación";
+      await notifyProjectMembers({
+        projectId: projectId!,
+        actorId: user.id,
+        title: `${dt} validada técnicamente`,
+        message: `"${claim?.title || ""}" ha sido validada. Pendiente de autorización de pago.`,
+        type: "cost",
+      });
     } else if (action === "authorize_payment") {
       await supabase.from("cost_claims").update({
         status: "approved", payment_authorized_by: user.id,
         payment_authorized_at: new Date().toISOString(),
       }).eq("id", id);
       toast.success("Pago autorizado");
+      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type").eq("id", id).single();
+      const dt = claim?.doc_type === "presupuesto" ? "Presupuesto" : "Certificación";
+      await notifyProjectMembers({
+        projectId: projectId!,
+        actorId: user.id,
+        title: `Pago autorizado: ${dt}`,
+        message: `"${claim?.title || ""}" ha sido autorizada para pago.`,
+        type: "cost",
+      });
     } else if (action === "reject") {
       await supabase.from("cost_claims").update({
         status: "rejected", rejected_by: user.id,
         rejected_at: new Date().toISOString(), rejection_reason: rejectReason || null,
       }).eq("id", id);
       toast.success("Documento rechazado");
+      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type, submitted_by").eq("id", id).single();
+      const dt = claim?.doc_type === "presupuesto" ? "Presupuesto" : "Certificación";
+      await notifyProjectMembers({
+        projectId: projectId!,
+        actorId: user.id,
+        title: `${dt} rechazada`,
+        message: `"${claim?.title || ""}" ha sido rechazada.${rejectReason ? ` Motivo: ${rejectReason}` : ""}`,
+        type: "cost",
+      });
     }
     setActionClaim(null); setRejectReason(""); fetchClaims();
     if (selectedClaim?.id === id) {
