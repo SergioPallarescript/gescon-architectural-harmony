@@ -25,6 +25,7 @@ import SignatureDocuments from "./pages/SignatureDocuments";
 import NotificationsHistory from "./pages/NotificationsHistory";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
+import Unsubscribe from "./pages/Unsubscribe";
 
 const queryClient = new QueryClient();
 
