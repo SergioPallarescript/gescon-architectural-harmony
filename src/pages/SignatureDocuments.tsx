@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import { toast } from "sonner";
+import { notifyUser } from "@/lib/notifications";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -173,6 +174,14 @@ const SignatureDocuments = () => {
       await supabase.from("audit_logs").insert({
         user_id: user.id, project_id: projectId, action: "signature_document_created",
         details: { title: title.trim(), recipient_id: recipientId, file_name: file.name },
+      });
+      // Notify recipient about pending signature
+      await notifyUser({
+        userId: recipientId,
+        projectId: projectId!,
+        title: "Firma pendiente",
+        message: `Tienes un nuevo documento para firmar: "${title.trim()}"`,
+        type: "signature",
       });
       setTitle(""); setRecipientId(""); setFile(null);
       toast.success("Documento enviado para firma");

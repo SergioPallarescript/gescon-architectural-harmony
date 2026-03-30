@@ -6,6 +6,7 @@ import { useProjectRole } from "@/hooks/useProjectRole";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { notifyUser } from "@/lib/notifications";
 import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import {
   ArrowLeft, CheckCircle2, Circle, Upload, FileText,
@@ -208,10 +209,12 @@ const CFOModule = () => {
     const { data: members } = await supabase.from("project_members").select("user_id, role").eq("project_id", projectId).eq("status", "accepted");
     const targets = (members || []).filter((m: any) => allowedRoles.includes(m.role) && m.user_id);
     for (const target of targets) {
-      await supabase.from("notifications").insert({
-        user_id: target.user_id, project_id: projectId, type: "cfo_claim",
+      await notifyUser({
+        userId: target.user_id,
+        projectId: projectId!,
         title: "⚠️ Reclamación de Documento CFO",
         message: `Atención: El DEM solicita la subida inmediata del documento pendiente: "${item.title}" (Punto ${item.item_number}). Este documento es indispensable para el cierre del CFO y la devolución de fianzas.`,
+        type: "cfo_claim",
       });
     }
     await supabase.from("cfo_items").update({ claimed_at: new Date().toISOString(), claimed_by: user.id }).eq("id", item.id);

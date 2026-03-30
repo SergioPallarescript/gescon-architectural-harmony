@@ -20,6 +20,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { notifyProjectMembers } from "@/lib/notifications";
 import {
   ArrowLeft, Plus, DollarSign, CheckCircle2, XCircle, Download, ExternalLink,
   Pencil, Trash2, Loader2, FileSignature, Upload, FileText,
@@ -158,7 +159,16 @@ const CostsModule = () => {
       submitted_by: user.id, doc_type: docType,
     } as any);
     if (error) { toast.error("Error al enviar"); setSubmitting(false); return; }
-    toast.success(`${docType === "presupuesto" ? "Presupuesto" : "Certificación"} enviado`);
+    const docLabel = docType === "presupuesto" ? "Presupuesto" : "Certificación";
+    toast.success(`${docLabel} enviado`);
+    // Notify project members about new economic document
+    await notifyProjectMembers({
+      projectId: projectId!,
+      actorId: user.id,
+      title: `Nueva ${docLabel}: ${title}`,
+      message: `Se ha subido ${docLabel === "Certificación" ? "una nueva Certificación" : "un nuevo Presupuesto"} pendiente de validación: "${title}"`,
+      type: "cost",
+    });
     setTitle(""); setDescription(""); setAmount(""); setFile(null); setDocType("certificacion");
     setCreateOpen(false); setSubmitting(false); fetchClaims();
   };
@@ -173,18 +183,45 @@ const CostsModule = () => {
         technical_approved_at: new Date().toISOString(),
       }).eq("id", id);
       toast.success("Validación técnica registrada");
+      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type").eq("id", id).single();
+      const dt = claim?.doc_type === "presupuesto" ? "Presupuesto" : "Certificación";
+      await notifyProjectMembers({
+        projectId: projectId!,
+        actorId: user.id,
+        title: `${dt} validada técnicamente`,
+        message: `"${claim?.title || ""}" ha sido validada. Pendiente de autorización de pago.`,
+        type: "cost",
+      });
     } else if (action === "authorize_payment") {
       await supabase.from("cost_claims").update({
         status: "approved", payment_authorized_by: user.id,
         payment_authorized_at: new Date().toISOString(),
       }).eq("id", id);
       toast.success("Pago autorizado");
+      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type").eq("id", id).single();
+      const dt = claim?.doc_type === "presupuesto" ? "Presupuesto" : "Certificación";
+      await notifyProjectMembers({
+        projectId: projectId!,
+        actorId: user.id,
+        title: `Pago autorizado: ${dt}`,
+        message: `"${claim?.title || ""}" ha sido autorizada para pago.`,
+        type: "cost",
+      });
     } else if (action === "reject") {
       await supabase.from("cost_claims").update({
         status: "rejected", rejected_by: user.id,
         rejected_at: new Date().toISOString(), rejection_reason: rejectReason || null,
       }).eq("id", id);
       toast.success("Documento rechazado");
+      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type, submitted_by").eq("id", id).single();
+      const dt = claim?.doc_type === "presupuesto" ? "Presupuesto" : "Certificación";
+      await notifyProjectMembers({
+        projectId: projectId!,
+        actorId: user.id,
+        title: `${dt} rechazada`,
+        message: `"${claim?.title || ""}" ha sido rechazada.${rejectReason ? ` Motivo: ${rejectReason}` : ""}`,
+        type: "cost",
+      });
     }
     setActionClaim(null); setRejectReason(""); fetchClaims();
     if (selectedClaim?.id === id) {
