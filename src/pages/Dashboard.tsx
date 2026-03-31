@@ -63,8 +63,8 @@ const Dashboard = () => {
       const urls: Record<string, string> = {};
       for (const p of data) {
         if ((p as any).cover_image_url) {
-          const { data: urlData } = supabase.storage.from("plans").getPublicUrl((p as any).cover_image_url);
-          if (urlData?.publicUrl) urls[p.id] = urlData.publicUrl;
+          const { data: urlData } = await supabase.storage.from("plans").createSignedUrl((p as any).cover_image_url, 3600);
+          if (urlData?.signedUrl) urls[p.id] = urlData.signedUrl;
         }
       }
       setCoverUrls(urls);
