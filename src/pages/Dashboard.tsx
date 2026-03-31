@@ -300,7 +300,7 @@ const Dashboard = () => {
                 )}
                 <button
                   onClick={() => !manageMode && navigate(`/project/${project.id}`)}
-                  className="w-full text-left"
+                  className="w-full text-left relative z-10"
                   disabled={manageMode}
                 >
                   <div className="flex items-start justify-between">
