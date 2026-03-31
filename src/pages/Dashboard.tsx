@@ -58,7 +58,17 @@ const Dashboard = () => {
       .select("*")
       .order("created_at", { ascending: false });
     if (data) {
-      setProjects(data);
+      setProjects(data as Project[]);
+      // Build cover image URLs
+      const urls: Record<string, string> = {};
+      for (const p of data) {
+        if ((p as any).cover_image_url) {
+          const { data: urlData } = supabase.storage.from("plans").getPublicUrl((p as any).cover_image_url);
+          if (urlData?.publicUrl) urls[p.id] = urlData.publicUrl;
+        }
+      }
+      setCoverUrls(urls);
+
       const progressMap: Record<string, number> = {};
       for (const project of data) {
         const [{ data: milestones }, { data: orders }] = await Promise.all([
