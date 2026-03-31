@@ -59,6 +59,8 @@ const SignatureDocuments = () => {
   const [replaceTarget, setReplaceTarget] = useState<SignatureDocument | null>(null);
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
   const [replacing, setReplacing] = useState(false);
+  const [fiscalModalOpen, setFiscalModalOpen] = useState(false);
+  const [fiscalData, setFiscalData] = useState<{ full_name: string; dni_cif: string } | null>(null);
 
   const fetchDocuments = async () => {
     if (!user) return;
