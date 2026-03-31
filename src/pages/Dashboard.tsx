@@ -285,9 +285,19 @@ const Dashboard = () => {
             {projects.map((project, i) => (
               <div
                 key={project.id}
-                className={`text-left bg-card border rounded-lg p-6 transition-all group animate-fade-in ${manageMode ? "border-primary/30" : "border-border hover:border-foreground/20"}`}
+                className={`text-left bg-card border rounded-lg p-6 transition-all group animate-fade-in relative overflow-hidden ${manageMode ? "border-primary/30" : "border-border hover:border-foreground/20"}`}
                 style={{ animationDelay: `${i * 80}ms` }}
               >
+                {coverUrls[project.id] && (
+                  <div
+                    className="absolute inset-0 bg-cover bg-center pointer-events-none"
+                    style={{
+                      backgroundImage: `url(${coverUrls[project.id]})`,
+                      filter: "grayscale(100%) brightness(1.2)",
+                      opacity: 0.12,
+                    }}
+                  />
+                )}
                 <button
                   onClick={() => !manageMode && navigate(`/project/${project.id}`)}
                   className="w-full text-left"
