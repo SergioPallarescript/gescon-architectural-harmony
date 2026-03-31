@@ -327,7 +327,7 @@ const Dashboard = () => {
                   </div>
                 </button>
                 {manageMode && isAdmin && (
-                  <div className="flex gap-2 mt-4 pt-3 border-t border-border">
+                  <div className="flex gap-2 mt-4 pt-3 border-t border-border relative z-10">
                     <Button variant="outline" size="sm" className="gap-1 text-xs font-display uppercase tracking-wider flex-1" onClick={() => {
                       setEditProject(project);
                       setEditData({ name: project.name, description: project.description || "", address: project.address || "", status: project.status });
