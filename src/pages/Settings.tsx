@@ -19,7 +19,20 @@ const roleLabels: Record<string, string> = {
 const Settings = () => {
   const { user, profile } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name || "");
+  const [dniCif, setDniCif] = useState("");
+  const [fiscalAddress, setFiscalAddress] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Load fiscal data
+  useState(() => {
+    if (!user) return;
+    supabase.from("profiles").select("dni_cif, fiscal_address").eq("user_id", user.id).single().then(({ data }) => {
+      if (data) {
+        setDniCif((data as any).dni_cif || "");
+        setFiscalAddress((data as any).fiscal_address || "");
+      }
+    });
+  });
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +40,11 @@ const Settings = () => {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName })
+      .update({
+        full_name: fullName,
+        dni_cif: dniCif || null,
+        fiscal_address: fiscalAddress || null,
+      } as any)
       .eq("user_id", user.id);
     if (error) { toast.error("Error al guardar"); } else { toast.success("Perfil actualizado"); }
     setSaving(false);
@@ -49,6 +66,14 @@ const Settings = () => {
             <div className="space-y-2">
               <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Correo Electrónico</Label>
               <Input value={profile?.email || user?.email || ""} disabled className="opacity-60" />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">DNI / CIF</Label>
+              <Input value={dniCif} onChange={(e) => setDniCif(e.target.value)} placeholder="12345678A o B12345678" />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Dirección Fiscal</Label>
+              <Input value={fiscalAddress} onChange={(e) => setFiscalAddress(e.target.value)} placeholder="Calle Mayor 1, 28001 Madrid" />
             </div>
             <Button type="submit" disabled={saving} className="font-display text-xs uppercase tracking-wider">
               {saving ? "Guardando..." : "Guardar Cambios"}

@@ -4,6 +4,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { ArrowLeft, CheckCircle2, Download, ExternalLink, FileSignature, Loader2, PenSquare, Send, Trash2, Upload, RefreshCw } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
+import FiscalDataModal from "@/components/FiscalDataModal";
 import SignatureCanvas, { type SignatureCanvasHandle } from "@/components/SignatureCanvas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +59,8 @@ const SignatureDocuments = () => {
   const [replaceTarget, setReplaceTarget] = useState<SignatureDocument | null>(null);
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
   const [replacing, setReplacing] = useState(false);
+  const [fiscalModalOpen, setFiscalModalOpen] = useState(false);
+  const [fiscalData, setFiscalData] = useState<{ full_name: string; dni_cif: string } | null>(null);
 
   const fetchDocuments = async () => {
     if (!user) return;
@@ -234,7 +237,26 @@ const SignatureDocuments = () => {
     finally { setReplacing(false); }
   };
 
-  const handleSignDocument = async () => {
+  // Check fiscal data before signing
+  const initiateSign = async () => {
+    if (!user) return;
+    // Check if user already has fiscal data
+    const { data: prof } = await supabase.from("profiles").select("full_name, dni_cif").eq("user_id", user.id).single();
+    if (prof?.dni_cif) {
+      setFiscalData({ full_name: prof.full_name || "", dni_cif: (prof as any).dni_cif || "" });
+      handleSignDocument(prof.full_name || "", (prof as any).dni_cif || "");
+    } else {
+      setFiscalModalOpen(true);
+    }
+  };
+
+  const handleFiscalComplete = (data: { full_name: string; dni_cif: string; fiscal_address: string }) => {
+    setFiscalModalOpen(false);
+    setFiscalData({ full_name: data.full_name, dni_cif: data.dni_cif });
+    handleSignDocument(data.full_name, data.dni_cif);
+  };
+
+  const handleSignDocument = async (signerName: string, signerDni: string) => {
     if (!projectId || !selectedDocument || !pdfBlobUrl || !signatureRef.current) return;
     if (signatureRef.current.isEmpty()) { toast.error("Debes dibujar una firma"); return; }
     setSigning(true);
@@ -262,13 +284,15 @@ const SignatureDocuments = () => {
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const boxX = 36, boxY = 36;
 
-      lastPage.drawRectangle({ x: boxX, y: boxY, width: 250, height: 110, color: rgb(0.97, 0.97, 0.97), borderColor: rgb(0.2, 0.2, 0.2), borderWidth: 1 });
-      lastPage.drawText("Firma digital validada — TEKTRA", { x: boxX + 12, y: boxY + 90, size: 9, font });
-      lastPage.drawText(`Hash: ${validationHash}`, { x: boxX + 12, y: boxY + 76, size: 8, font });
-      lastPage.drawText(`Fecha: ${new Date(signedAt).toLocaleString("es-ES")}`, { x: boxX + 12, y: boxY + 64, size: 8, font });
-      lastPage.drawText(`Usuario: ${user?.id?.slice(0, 8)}… | Geo: ${geo || "N/A"}`, { x: boxX + 12, y: boxY + 52, size: 7, font, color: rgb(0.4, 0.4, 0.4) });
-      const sigW = 160, sigH = Math.min((signatureImage.height / signatureImage.width) * sigW, 36);
-      lastPage.drawImage(signatureImage, { x: boxX + 12, y: boxY + 8, width: sigW, height: sigH });
+      lastPage.drawRectangle({ x: boxX, y: boxY, width: 250, height: 120, color: rgb(0.97, 0.97, 0.97), borderColor: rgb(0.2, 0.2, 0.2), borderWidth: 1 });
+      lastPage.drawText("Firma digital validada — TEKTRA", { x: boxX + 12, y: boxY + 102, size: 9, font });
+      lastPage.drawText(signerName, { x: boxX + 12, y: boxY + 90, size: 8, font, color: rgb(0.1, 0.1, 0.1) });
+      lastPage.drawText(`DNI/CIF: ${signerDni}`, { x: boxX + 12, y: boxY + 78, size: 8, font, color: rgb(0.1, 0.1, 0.1) });
+      lastPage.drawText(`Hash: ${validationHash}`, { x: boxX + 12, y: boxY + 66, size: 7, font, color: rgb(0.4, 0.4, 0.4) });
+      lastPage.drawText(`Fecha: ${new Date(signedAt).toLocaleString("es-ES")}`, { x: boxX + 12, y: boxY + 56, size: 7, font, color: rgb(0.4, 0.4, 0.4) });
+      lastPage.drawText(`Geo: ${geo || "N/A"}`, { x: boxX + 12, y: boxY + 46, size: 6, font, color: rgb(0.5, 0.5, 0.5) });
+      const sigW = 160, sigH = Math.min((signatureImage.height / signatureImage.width) * sigW, 32);
+      lastPage.drawImage(signatureImage, { x: boxX + 12, y: boxY + 6, width: sigW, height: sigH });
 
       const signedBytes = await pdfDoc.save();
       const signedBlob = new Blob([Uint8Array.from(signedBytes)], { type: "application/pdf" });
@@ -284,7 +308,7 @@ const SignatureDocuments = () => {
       await supabase.from("audit_logs").insert({
         user_id: user?.id, project_id: projectId,
         action: "signature_document_signed",
-        details: { document_id: selectedDocument.id, hash: validationHash, geo_location: geo },
+        details: { document_id: selectedDocument.id, hash: validationHash, geo_location: geo, signer_name: signerName, signer_dni: signerDni },
         geo_location: geo,
       });
 
@@ -466,10 +490,10 @@ const SignatureDocuments = () => {
                     <SignatureCanvas ref={signatureRef} />
                     <div className="flex flex-wrap gap-2">
                       <Button variant="outline" onClick={() => signatureRef.current?.clear()}>Limpiar firma</Button>
-                      <Button onClick={handleSignDocument} disabled={signing} className="gap-2 font-display text-xs uppercase tracking-wider">
-                        {signing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
-                        {signing ? "Firmando..." : "Firmar y Validar"}
-                      </Button>
+                      <Button onClick={initiateSign} disabled={signing} className="gap-2 font-display text-xs uppercase tracking-wider">
+                         {signing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
+                         {signing ? "Firmando..." : "Firmar y Validar"}
+                       </Button>
                     </div>
                   </div>
                 ) : selectedDocument.validation_hash ? (
@@ -533,6 +557,12 @@ const SignatureDocuments = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <FiscalDataModal
+        open={fiscalModalOpen}
+        onComplete={handleFiscalComplete}
+        onCancel={() => setFiscalModalOpen(false)}
+      />
     </AppLayout>
   );
 };

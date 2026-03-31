@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import { useAuth } from "@/hooks/useAuth";
 import AppLayout from "@/components/AppLayout";
 import ProgressRing from "@/components/ProgressRing";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Building2, FileSignature, MapPin, Users, Settings, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Building2, FileSignature, MapPin, Users, Settings, Pencil, Trash2, X, ImagePlus } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -26,6 +27,7 @@ interface Project {
   status: string;
   created_at: string;
   created_by: string | null;
+  cover_image_url: string | null;
 }
 
 const Dashboard = () => {
@@ -47,6 +49,8 @@ const Dashboard = () => {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverUrls, setCoverUrls] = useState<Record<string, string>>({});
 
   const fetchProjects = async () => {
     const { data } = await supabase
@@ -54,7 +58,17 @@ const Dashboard = () => {
       .select("*")
       .order("created_at", { ascending: false });
     if (data) {
-      setProjects(data);
+      setProjects(data as Project[]);
+      // Build cover image URLs
+      const urls: Record<string, string> = {};
+      for (const p of data) {
+        if ((p as any).cover_image_url) {
+          const { data: urlData } = await supabase.storage.from("plans").createSignedUrl((p as any).cover_image_url, 3600);
+          if (urlData?.signedUrl) urls[p.id] = urlData.signedUrl;
+        }
+      }
+      setCoverUrls(urls);
+
       const progressMap: Record<string, number> = {};
       for (const project of data) {
         const [{ data: milestones }, { data: orders }] = await Promise.all([
@@ -130,6 +144,17 @@ const Dashboard = () => {
     if (!editProject || !user) return;
     setEditSubmitting(true);
     try {
+      let coverImageUrl = editProject.cover_image_url;
+
+      // Upload cover image if provided
+      if (coverFile) {
+        const safeName = sanitizeFileName(coverFile.name);
+        const path = `project-covers/${editProject.id}/${Date.now()}_${safeName}`;
+        const { error: upErr } = await uploadFileWithFallback({ path, file: coverFile });
+        if (upErr) throw new Error("Error al subir la imagen de portada");
+        coverImageUrl = path;
+      }
+
       const { data: session } = await supabase.auth.getSession();
       const res = await supabase.functions.invoke("manage-project", {
         body: {
@@ -139,6 +164,7 @@ const Dashboard = () => {
           description: editData.description,
           address: editData.address,
           status: editData.status,
+          cover_image_url: coverImageUrl,
         },
         headers: { Authorization: `Bearer ${session.session?.access_token}` },
       });
@@ -146,6 +172,7 @@ const Dashboard = () => {
       if (res.data?.error) throw new Error(res.data.error);
       toast.success("Proyecto actualizado");
       setEditProject(null);
+      setCoverFile(null);
       fetchProjects();
     } catch (err: any) {
       toast.error(err.message || "Error al editar el proyecto");
@@ -258,12 +285,22 @@ const Dashboard = () => {
             {projects.map((project, i) => (
               <div
                 key={project.id}
-                className={`text-left bg-card border rounded-lg p-6 transition-all group animate-fade-in ${manageMode ? "border-primary/30" : "border-border hover:border-foreground/20"}`}
+                className={`text-left bg-card border rounded-lg p-6 transition-all group animate-fade-in relative overflow-hidden ${manageMode ? "border-primary/30" : "border-border hover:border-foreground/20"}`}
                 style={{ animationDelay: `${i * 80}ms` }}
               >
+                {coverUrls[project.id] && (
+                  <div
+                    className="absolute inset-0 bg-cover bg-center pointer-events-none"
+                    style={{
+                      backgroundImage: `url(${coverUrls[project.id]})`,
+                      filter: "grayscale(100%) brightness(1.2)",
+                      opacity: 0.12,
+                    }}
+                  />
+                )}
                 <button
                   onClick={() => !manageMode && navigate(`/project/${project.id}`)}
-                  className="w-full text-left"
+                  className="w-full text-left relative z-10"
                   disabled={manageMode}
                 >
                   <div className="flex items-start justify-between">
@@ -290,7 +327,7 @@ const Dashboard = () => {
                   </div>
                 </button>
                 {manageMode && isAdmin && (
-                  <div className="flex gap-2 mt-4 pt-3 border-t border-border">
+                  <div className="flex gap-2 mt-4 pt-3 border-t border-border relative z-10">
                     <Button variant="outline" size="sm" className="gap-1 text-xs font-display uppercase tracking-wider flex-1" onClick={() => {
                       setEditProject(project);
                       setEditData({ name: project.name, description: project.description || "", address: project.address || "", status: project.status });
@@ -328,6 +365,15 @@ const Dashboard = () => {
             <div className="space-y-2">
               <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Estado</Label>
               <Input value={editData.status} onChange={(e) => setEditData(prev => ({ ...prev, status: e.target.value }))} placeholder="active, completed, cancelled" />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <ImagePlus className="h-3.5 w-3.5" /> Imagen de Portada
+              </Label>
+              <Input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} className="cursor-pointer" />
+              {editProject?.cover_image_url && !coverFile && (
+                <p className="text-xs text-muted-foreground">Ya tiene imagen de portada</p>
+              )}
             </div>
             <Button type="submit" disabled={editSubmitting} className="w-full font-display text-xs uppercase tracking-wider">
               {editSubmitting ? "Guardando..." : "Guardar Cambios"}
