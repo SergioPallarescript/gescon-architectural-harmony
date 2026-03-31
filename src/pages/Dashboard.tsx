@@ -49,6 +49,8 @@ const Dashboard = () => {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverUrls, setCoverUrls] = useState<Record<string, string>>({});
 
   const fetchProjects = async () => {
     const { data } = await supabase
