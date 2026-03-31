@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Building2, FileSignature, MapPin, Users, Settings, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Building2, FileSignature, MapPin, Users, Settings, Pencil, Trash2, X, ImagePlus } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
