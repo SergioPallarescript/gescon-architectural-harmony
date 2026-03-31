@@ -40,7 +40,11 @@ const Settings = () => {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName })
+      .update({
+        full_name: fullName,
+        dni_cif: dniCif || null,
+        fiscal_address: fiscalAddress || null,
+      } as any)
       .eq("user_id", user.id);
     if (error) { toast.error("Error al guardar"); } else { toast.success("Perfil actualizado"); }
     setSaving(false);
