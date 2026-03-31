@@ -19,7 +19,20 @@ const roleLabels: Record<string, string> = {
 const Settings = () => {
   const { user, profile } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name || "");
+  const [dniCif, setDniCif] = useState("");
+  const [fiscalAddress, setFiscalAddress] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Load fiscal data
+  useState(() => {
+    if (!user) return;
+    supabase.from("profiles").select("dni_cif, fiscal_address").eq("user_id", user.id).single().then(({ data }) => {
+      if (data) {
+        setDniCif((data as any).dni_cif || "");
+        setFiscalAddress((data as any).fiscal_address || "");
+      }
+    });
+  });
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
