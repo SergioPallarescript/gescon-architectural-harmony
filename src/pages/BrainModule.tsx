@@ -208,7 +208,43 @@ const BrainModule = () => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const toggleVoiceRecording = () => {
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+      toast.error("Tu navegador no soporta reconocimiento de voz"); return;
+    }
+    if (voiceRecording) {
+      voiceRecognitionRef.current?.stop();
+      voiceRecognitionRef.current = null;
+      setVoiceRecording(false);
+      return;
+    }
+    const startRecognition = () => {
+      const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SR();
+      voiceRecognitionRef.current = recognition;
+      recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
+      recognition.onresult = (event: any) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
+        setInput(transcript);
+      };
+      recognition.onerror = (e: any) => {
+        if (e.error === "no-speech" || e.error === "aborted") return;
+        setVoiceRecording(false); voiceRecognitionRef.current = null;
+        toast.error("Error en reconocimiento de voz");
+      };
+      recognition.onend = () => {
+        if (voiceRecognitionRef.current) {
+          try { recognition.start(); } catch { /* already started */ }
+        }
+      };
+      recognition.start();
+    };
+    startRecognition();
+    setVoiceRecording(true);
+  };
+
+
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
