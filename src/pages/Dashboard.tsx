@@ -146,11 +146,11 @@ const Dashboard = () => {
     try {
       let coverImageUrl = editProject.cover_image_url;
 
-      // Upload cover image if provided
+      // Upload cover image if provided (compress to WebP first)
       if (coverFile) {
-        const safeName = sanitizeFileName(coverFile.name);
-        const path = `project-covers/${editProject.id}/${Date.now()}_${safeName}`;
-        const { error: upErr } = await uploadFileWithFallback({ path, file: coverFile });
+        const compressed = await compressCoverImage(coverFile);
+        const path = `project-covers/${editProject.id}/${Date.now()}_cover.webp`;
+        const { error: upErr } = await uploadFileWithFallback({ path, file: compressed });
         if (upErr) throw new Error("Error al subir la imagen de portada");
         coverImageUrl = path;
       }
