@@ -244,7 +244,7 @@ const BrainModule = () => {
     setVoiceRecording(true);
   };
 
-
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
