@@ -216,7 +216,7 @@ const ProjectDetail = () => {
               if (!open) setInviteSuccess(null);
             }}>
               <DialogTrigger asChild>
-                <Button variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
+                <Button data-tour="invite-agent" variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
                   <UserPlus className="h-4 w-4" />
                   Invitar Agente
                 </Button>
@@ -365,7 +365,7 @@ const ProjectDetail = () => {
 
         {/* Team */}
         <div className="mb-8">
-          <h2 className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3 flex items-center gap-2">
+        <h2 data-tour="project-team" className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3 flex items-center gap-2">
             <Users className="h-3.5 w-3.5" />
             Equipo del Proyecto
           </h2>
@@ -394,13 +394,14 @@ const ProjectDetail = () => {
         </div>
 
         {/* Modules Grid */}
-        <h2 className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground mb-4">
+        <h2 data-tour="modules-grid" className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground mb-4">
           Módulos
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {modules.map((mod, i) => (
             <button
               key={mod.key}
+              data-tour={`module-${mod.key}`}
               onClick={() => navigate(`/project/${id}/${mod.key}`)}
               className="bg-card border border-border rounded-lg p-5 text-left hover:border-foreground/20 transition-all group animate-fade-in"
               style={{ animationDelay: `${i * 60}ms` }}

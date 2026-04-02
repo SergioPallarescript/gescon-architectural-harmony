@@ -145,7 +145,7 @@ const ProjectDocs = () => {
             </p>
           </div>
           {canUpload && (
-            <label className="cursor-pointer shrink-0">
+            <label data-tour="upload-docs" className="cursor-pointer shrink-0">
               <input
                 type="file"
                 multiple

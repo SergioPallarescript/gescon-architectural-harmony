@@ -293,7 +293,7 @@ const CFOModule = () => {
 
         <div className="flex gap-2 mb-6 flex-wrap">
           {isDEM && (
-            <Button onClick={handleAudit} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={auditing}>
+            <Button data-tour="cfo-audit" onClick={handleAudit} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={auditing}>
               <Shield className="h-4 w-4" /> {auditing ? "Escaneando..." : "Auditoría de Archivo"}
             </Button>
           )}

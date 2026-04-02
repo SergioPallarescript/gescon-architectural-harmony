@@ -345,7 +345,7 @@ const PlansModule = () => {
               {isAdmin && (
                 <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                   <DialogTrigger asChild>
-                    <Button className="font-display text-xs uppercase tracking-wider gap-2"><Plus className="h-4 w-4" />Nuevo Plano</Button>
+                    <Button data-tour="new-plan" className="font-display text-xs uppercase tracking-wider gap-2"><Plus className="h-4 w-4" />Nuevo Plano</Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader><DialogTitle className="font-display">Añadir Plano</DialogTitle></DialogHeader>

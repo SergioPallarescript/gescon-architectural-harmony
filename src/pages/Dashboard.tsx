@@ -261,7 +261,7 @@ const Dashboard = () => {
             {isAdmin && (
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="font-display text-xs uppercase tracking-wider gap-2">
+                  <Button data-tour="new-project" className="font-display text-xs uppercase tracking-wider gap-2">
                     <Plus className="h-4 w-4" />Nuevo Proyecto
                   </Button>
                 </DialogTrigger>
@@ -315,7 +315,7 @@ const Dashboard = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div data-tour="projects-list" className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {projects.map((project, i) => (
               <div
                 key={project.id}
