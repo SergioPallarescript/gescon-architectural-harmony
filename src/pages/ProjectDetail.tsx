@@ -94,12 +94,23 @@ const ProjectDetail = () => {
     e.preventDefault();
     if (!id || !user) return;
 
-    const { error } = await supabase.from("project_members").insert({
+    // Check if the invited email belongs to an already-registered user
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("email", inviteEmail.trim().toLowerCase())
+      .maybeSingle();
+
+    const memberPayload: any = {
       project_id: id,
-      invited_email: inviteEmail,
+      invited_email: inviteEmail.trim().toLowerCase(),
       role: inviteRole,
-      status: "pending",
-    });
+      status: existingProfile ? "accepted" : "pending",
+      user_id: existingProfile?.user_id || null,
+      accepted_at: existingProfile ? new Date().toISOString() : null,
+    };
+
+    const { error } = await supabase.from("project_members").insert(memberPayload);
 
     if (error) {
       toast.error(error.message.includes("duplicate") ? "Ya está invitado" : "Error al invitar");
