@@ -434,7 +434,7 @@ const CostsModule = () => {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1 className="font-display text-3xl font-bold tracking-tighter">Validación Económica</h1>
           {canSubmit && (
-            <Button onClick={() => setCreateOpen(true)} className="font-display text-xs uppercase tracking-wider gap-2">
+            <Button data-tour="new-cost" onClick={() => setCreateOpen(true)} className="font-display text-xs uppercase tracking-wider gap-2">
               <Plus className="h-4 w-4" /> Nuevo Documento
             </Button>
           )}

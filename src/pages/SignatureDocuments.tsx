@@ -366,7 +366,7 @@ const SignatureDocuments = () => {
               <p className="mt-1 text-sm text-muted-foreground">Flujo privado con validación legal y hash único.</p>
             </div>
 
-            <form onSubmit={handleCreateDocument} className="rounded-lg border border-border bg-card p-4 space-y-4">
+            <form data-tour="send-signature" onSubmit={handleCreateDocument} className="rounded-lg border border-border bg-card p-4 space-y-4">
               <div className="space-y-2">
                 <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Título</Label>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Acta de recepción parcial" required />

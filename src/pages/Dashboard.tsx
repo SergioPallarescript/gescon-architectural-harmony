@@ -315,7 +315,7 @@ const Dashboard = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div data-tour="projects-list" className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {projects.map((project, i) => (
               <div
                 key={project.id}

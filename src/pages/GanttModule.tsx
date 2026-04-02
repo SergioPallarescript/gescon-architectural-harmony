@@ -379,13 +379,13 @@ const GanttModule = () => {
         </Button>
       )}
       {isAdmin && (
-        <Button onClick={handleGenerateClick} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
+        <Button data-tour="generate-gantt" onClick={handleGenerateClick} disabled={generating} className="font-display text-xs uppercase tracking-wider gap-2">
           {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarDays className="h-4 w-4" />}
           {generating ? "Generando..." : items.length === 0 ? "Generar desde documentos" : "Regenerar"}
         </Button>
       )}
       {isAdmin && (
-        <Button onClick={addItem} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
+        <Button data-tour="add-milestone" onClick={addItem} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
           <Plus className="h-4 w-4" /> Añadir Hito
         </Button>
       )}

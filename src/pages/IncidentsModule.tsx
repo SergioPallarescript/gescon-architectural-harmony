@@ -293,7 +293,7 @@ const IncidentsModule = () => {
           {canWrite && (
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="font-display text-xs uppercase tracking-wider gap-2"><Plus className="h-4 w-4" />Nueva Incidencia</Button>
+                <Button data-tour="new-incident" className="font-display text-xs uppercase tracking-wider gap-2"><Plus className="h-4 w-4" />Nueva Incidencia</Button>
               </DialogTrigger>
               <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle className="font-display">Registrar Incidencia</DialogTitle></DialogHeader>
