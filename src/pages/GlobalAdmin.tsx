@@ -239,6 +239,9 @@ const GlobalAdmin = () => {
                       <Button variant="outline" size="sm" className="text-xs gap-1" onClick={() => openAssign(u)}>
                         <FolderPlus className="h-3 w-3" /> Proyectos
                       </Button>
+                      <Button variant="destructive" size="sm" className="text-xs gap-1" onClick={() => setDeletingUser(u)}>
+                        <Trash2 className="h-3 w-3" /> Eliminar
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
