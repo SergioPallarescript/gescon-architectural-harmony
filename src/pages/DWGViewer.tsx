@@ -644,7 +644,7 @@ const DWGViewer = () => {
                 <Crosshair className="h-3.5 w-3.5" /> Snap {snapEnabled ? "ON" : "OFF"}
               </Button>
               <div className="w-px h-6 bg-border mx-1" />
-              <Button variant="ghost" size="sm" onClick={() => { setMeasurements([]); setCurrentPoints([]); }} className="gap-1 text-xs"><RotateCcw className="h-3.5 w-3.5" /> Limpiar</Button>
+              <Button data-tour="dwg-clean" variant="ghost" size="sm" onClick={() => { setMeasurements([]); setCurrentPoints([]); }} className="gap-1 text-xs"><RotateCcw className="h-3.5 w-3.5" /> Limpiar</Button>
               {tool === "area" && currentPoints.length >= 3 && (
                 <Button size="sm" onClick={handleAreaComplete} className="gap-1 text-xs ml-2">Cerrar Área</Button>
               )}
