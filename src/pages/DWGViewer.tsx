@@ -651,7 +651,7 @@ const DWGViewer = () => {
               {!isFileLoaded && !fileLoading && (
                 <>
                   <div className="w-px h-6 bg-border mx-1" />
-                  <Button variant="outline" size="sm" onClick={() => loadFile(selectedFile)} className="gap-1 text-xs">
+                   <Button data-tour="dwg-load-pdf" variant="outline" size="sm" onClick={() => loadFile(selectedFile)} className="gap-1 text-xs">
                     <FileText className="h-3.5 w-3.5" /> Cargar PDF
                   </Button>
                 </>

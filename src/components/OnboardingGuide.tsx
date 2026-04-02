@@ -37,15 +37,17 @@ const OnboardingGuide = () => {
         return;
       }
 
-      const joyrideSteps: Step[] = (data as any[]).map(s => ({
-        target: s.target_element || "body",
-        title: s.title,
-        content: s.content,
-        disableBeacon: true,
-        placement: "auto" as const,
-        // If target doesn't exist, show as centered modal
-        floaterProps: { disableAnimation: true },
-      }));
+      const joyrideSteps: Step[] = (data as any[]).map(s => {
+        const isBodyTarget = !s.target_element || s.target_element === "body";
+        return {
+          target: isBodyTarget ? "body" : s.target_element,
+          title: s.title,
+          content: s.content,
+          disableBeacon: true,
+          placement: isBodyTarget ? ("center" as const) : ("auto" as const),
+          floaterProps: { disableAnimation: true },
+        };
+      });
 
       setSteps(joyrideSteps);
     };
