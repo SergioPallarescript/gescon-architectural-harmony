@@ -117,6 +117,7 @@ const App = () => (
             <Route path="/project/:id/signatures" element={<ProtectedRoute><SignatureDocuments /></ProtectedRoute>} />
             <Route path="/project/:id/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><NotificationsHistory /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><GlobalAdmin /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
