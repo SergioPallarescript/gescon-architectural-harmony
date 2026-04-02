@@ -633,10 +633,10 @@ const DWGViewer = () => {
                 <Target className="h-3.5 w-3.5" /> {calibration ? "Recalibrar" : "① Calibrar"}
               </Button>
               <div className="w-px h-6 bg-border mx-1" />
-              <Button variant={tool === "line" ? "default" : "ghost"} size="sm"
+              <Button data-tour="dwg-measure" variant={tool === "line" ? "default" : "ghost"} size="sm"
                 onClick={() => { if (!calibration) { toast.error("Calibra primero"); setTool("calibrate"); } else setTool("line"); }}
                 className="gap-1 text-xs"><Ruler className="h-3.5 w-3.5" /> Medir</Button>
-              <Button variant={tool === "area" ? "default" : "ghost"} size="sm"
+              <Button data-tour="dwg-area" variant={tool === "area" ? "default" : "ghost"} size="sm"
                 onClick={() => { if (!calibration) { toast.error("Calibra primero"); setTool("calibrate"); } else { setTool("area"); setCurrentPoints([]); } }}
                 className="gap-1 text-xs"><Square className="h-3.5 w-3.5" /> Área</Button>
               <div className="w-px h-6 bg-border mx-1" />
