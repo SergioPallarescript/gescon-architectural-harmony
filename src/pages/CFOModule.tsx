@@ -377,7 +377,7 @@ const CFOModule = () => {
                             </Button>
                           )}
                           {isDEM && isPending && (
-                            <Button size="sm" variant="ghost" onClick={() => setClaimDialog({ open: true, item })} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-destructive hover:text-destructive">
+                            <Button data-tour="cfo-reclaim" size="sm" variant="ghost" onClick={() => setClaimDialog({ open: true, item })} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-destructive hover:text-destructive">
                               <Bell className="h-3 w-3" /> Reclamar
                             </Button>
                           )}

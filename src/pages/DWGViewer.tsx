@@ -553,7 +553,7 @@ const DWGViewer = () => {
               {canUpload && (
                 <label className="cursor-pointer">
                   <input type="file" className="hidden" accept=".pdf" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
-                  <Button asChild variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={uploading}>
+                   <Button data-tour="dwg-upload" asChild variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={uploading}>
                     <span><Upload className="h-4 w-4" />{uploading ? "Subiendo..." : "Subir Plano"}</span>
                   </Button>
                 </label>
@@ -625,7 +625,7 @@ const DWGViewer = () => {
 
             {/* Toolbar */}
             <div data-tour="dwg-toolbar" className="flex items-center gap-1 mb-3 bg-card border border-border rounded-lg p-1.5 flex-wrap">
-              <Button variant={tool === "move" ? "default" : "ghost"} size="sm" onClick={() => setTool("move")} className="gap-1 text-xs"><Move className="h-3.5 w-3.5" /> Mover</Button>
+              <Button data-tour="dwg-move" variant={tool === "move" ? "default" : "ghost"} size="sm" onClick={() => setTool("move")} className="gap-1 text-xs"><Move className="h-3.5 w-3.5" /> Mover</Button>
               <div className="w-px h-6 bg-border mx-1" />
               <Button data-tour="dwg-calibrate" variant={tool === "calibrate" ? "default" : "ghost"} size="sm"
                 onClick={() => { setTool("calibrate"); setCalibPoints([]); setCurrentPoints([]); }}
@@ -633,10 +633,10 @@ const DWGViewer = () => {
                 <Target className="h-3.5 w-3.5" /> {calibration ? "Recalibrar" : "① Calibrar"}
               </Button>
               <div className="w-px h-6 bg-border mx-1" />
-              <Button variant={tool === "line" ? "default" : "ghost"} size="sm"
+              <Button data-tour="dwg-measure" variant={tool === "line" ? "default" : "ghost"} size="sm"
                 onClick={() => { if (!calibration) { toast.error("Calibra primero"); setTool("calibrate"); } else setTool("line"); }}
                 className="gap-1 text-xs"><Ruler className="h-3.5 w-3.5" /> Medir</Button>
-              <Button variant={tool === "area" ? "default" : "ghost"} size="sm"
+              <Button data-tour="dwg-area" variant={tool === "area" ? "default" : "ghost"} size="sm"
                 onClick={() => { if (!calibration) { toast.error("Calibra primero"); setTool("calibrate"); } else { setTool("area"); setCurrentPoints([]); } }}
                 className="gap-1 text-xs"><Square className="h-3.5 w-3.5" /> Área</Button>
               <div className="w-px h-6 bg-border mx-1" />
@@ -644,14 +644,14 @@ const DWGViewer = () => {
                 <Crosshair className="h-3.5 w-3.5" /> Snap {snapEnabled ? "ON" : "OFF"}
               </Button>
               <div className="w-px h-6 bg-border mx-1" />
-              <Button variant="ghost" size="sm" onClick={() => { setMeasurements([]); setCurrentPoints([]); }} className="gap-1 text-xs"><RotateCcw className="h-3.5 w-3.5" /> Limpiar</Button>
+              <Button data-tour="dwg-clean" variant="ghost" size="sm" onClick={() => { setMeasurements([]); setCurrentPoints([]); }} className="gap-1 text-xs"><RotateCcw className="h-3.5 w-3.5" /> Limpiar</Button>
               {tool === "area" && currentPoints.length >= 3 && (
                 <Button size="sm" onClick={handleAreaComplete} className="gap-1 text-xs ml-2">Cerrar Área</Button>
               )}
               {!isFileLoaded && !fileLoading && (
                 <>
                   <div className="w-px h-6 bg-border mx-1" />
-                  <Button variant="outline" size="sm" onClick={() => loadFile(selectedFile)} className="gap-1 text-xs">
+                   <Button data-tour="dwg-load-pdf" variant="outline" size="sm" onClick={() => loadFile(selectedFile)} className="gap-1 text-xs">
                     <FileText className="h-3.5 w-3.5" /> Cargar PDF
                   </Button>
                 </>
