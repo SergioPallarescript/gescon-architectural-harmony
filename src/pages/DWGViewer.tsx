@@ -553,7 +553,7 @@ const DWGViewer = () => {
               {canUpload && (
                 <label className="cursor-pointer">
                   <input type="file" className="hidden" accept=".pdf" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
-                  <Button asChild variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={uploading}>
+                   <Button data-tour="dwg-upload" asChild variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={uploading}>
                     <span><Upload className="h-4 w-4" />{uploading ? "Subiendo..." : "Subir Plano"}</span>
                   </Button>
                 </label>
