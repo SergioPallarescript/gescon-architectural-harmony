@@ -21,6 +21,7 @@ import ProjectDocs from "./pages/ProjectDocs";
 import GanttModule from "./pages/GanttModule";
 import Settings from "./pages/Settings";
 import AdminPanel from "./pages/AdminPanel";
+import GlobalAdmin from "./pages/GlobalAdmin";
 import SignatureDocuments from "./pages/SignatureDocuments";
 import NotificationsHistory from "./pages/NotificationsHistory";
 import NotFound from "./pages/NotFound";
@@ -116,6 +117,7 @@ const App = () => (
             <Route path="/project/:id/signatures" element={<ProtectedRoute><SignatureDocuments /></ProtectedRoute>} />
             <Route path="/project/:id/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><NotificationsHistory /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><GlobalAdmin /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

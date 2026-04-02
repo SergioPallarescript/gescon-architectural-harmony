@@ -38,12 +38,20 @@ export function useProjectRole(projectId: string | undefined): ProjectRoleResult
         // 1. Try by user_id first
         const { data: membership } = await supabase
           .from("project_members")
-          .select("role, secondary_role")
+          .select("role, secondary_role, status")
           .eq("project_id", projectId)
           .eq("user_id", user.id)
           .maybeSingle();
 
         if (membership) {
+          // Auto-activate: if status is not "accepted", update it
+          if (membership.status && membership.status !== "accepted") {
+            await supabase
+              .from("project_members")
+              .update({ status: "accepted", accepted_at: new Date().toISOString() })
+              .eq("project_id", projectId)
+              .eq("user_id", user.id);
+          }
           setProjectRole(membership.role as AppRole);
           setSecondaryRole((membership.secondary_role as AppRole) || null);
           setLoading(false);
