@@ -5,29 +5,18 @@ import { useAuth } from "@/hooks/useAuth";
 type AppRole = "DO" | "DEM" | "CON" | "PRO" | "CSS";
 
 interface ProjectRoleResult {
-  /** Primary role in this project */
   projectRole: AppRole | null;
-  /** Secondary (dual) role in this project */
   secondaryRole: AppRole | null;
-  /** Whether the user is DO or DEM in this project */
   isAdmin: boolean;
-  /** Convenience booleans */
   isDO: boolean;
   isDEM: boolean;
   isCON: boolean;
   isPRO: boolean;
   isCSS: boolean;
-  /** True if user has CSS as primary or secondary role */
   hasDualCSS: boolean;
-  /** Loading state */
   loading: boolean;
 }
 
-/**
- * Fetches the user's role from `project_members` for a specific project.
- * This is the single source of truth for permissions — never use profile.role
- * for project-scoped decisions.
- */
 export function useProjectRole(projectId: string | undefined): ProjectRoleResult {
   const { user } = useAuth();
   const [projectRole, setProjectRole] = useState<AppRole | null>(null);
@@ -45,39 +34,56 @@ export function useProjectRole(projectId: string | undefined): ProjectRoleResult
     setLoading(true);
 
     const fetchRole = async () => {
-      // First check if user is the project creator
-      const { data: project } = await supabase
-        .from("projects")
-        .select("created_by")
-        .eq("id", projectId)
-        .single();
-
-      // Fetch from project_members
-      const { data: membership } = await supabase
-        .from("project_members")
-        .select("role, secondary_role")
-        .eq("project_id", projectId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (membership) {
-        setProjectRole(membership.role as AppRole);
-        setSecondaryRole((membership.secondary_role as AppRole) || null);
-      } else if (project?.created_by === user.id) {
-        // Creator might not have a project_members row — check their profile
-        // as fallback for the creator who auto-inserted themselves
-        const { data: creatorMember } = await supabase
+      try {
+        // 1. Try by user_id first
+        const { data: membership } = await supabase
           .from("project_members")
           .select("role, secondary_role")
           .eq("project_id", projectId)
           .eq("user_id", user.id)
           .maybeSingle();
-        
-        if (creatorMember) {
-          setProjectRole(creatorMember.role as AppRole);
-          setSecondaryRole((creatorMember.secondary_role as AppRole) || null);
-        } else {
-          // Absolute fallback: use profile role for creator
+
+        if (membership) {
+          setProjectRole(membership.role as AppRole);
+          setSecondaryRole((membership.secondary_role as AppRole) || null);
+          setLoading(false);
+          return;
+        }
+
+        // 2. Fallback: check by invited_email (user may have registered but
+        //    the handle_new_user trigger may not have linked user_id yet)
+        const userEmail = user.email;
+        if (userEmail) {
+          const { data: emailMembership } = await supabase
+            .from("project_members")
+            .select("id, role, secondary_role")
+            .eq("project_id", projectId)
+            .eq("invited_email", userEmail)
+            .is("user_id", null)
+            .maybeSingle();
+
+          if (emailMembership) {
+            // Auto-link user_id for future lookups
+            await supabase
+              .from("project_members")
+              .update({ user_id: user.id, status: "accepted", accepted_at: new Date().toISOString() })
+              .eq("id", emailMembership.id);
+
+            setProjectRole(emailMembership.role as AppRole);
+            setSecondaryRole((emailMembership.secondary_role as AppRole) || null);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // 3. Check if creator
+        const { data: project } = await supabase
+          .from("projects")
+          .select("created_by")
+          .eq("id", projectId)
+          .single();
+
+        if (project?.created_by === user.id) {
           const { data: profileData } = await supabase
             .from("profiles")
             .select("role")
@@ -85,8 +91,12 @@ export function useProjectRole(projectId: string | undefined): ProjectRoleResult
             .single();
           setProjectRole((profileData?.role as AppRole) || null);
           setSecondaryRole(null);
+        } else {
+          setProjectRole(null);
+          setSecondaryRole(null);
         }
-      } else {
+      } catch (err) {
+        console.error("Error fetching project role:", err);
         setProjectRole(null);
         setSecondaryRole(null);
       }
