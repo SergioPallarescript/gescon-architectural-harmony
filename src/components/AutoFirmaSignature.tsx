@@ -39,7 +39,7 @@ export default function AutoFirmaSignature({ disabled, onSign, originalPdfBytes 
         toast.success("AutoFirma detectado en el sistema");
       }
     } catch {
-      setStatus({ available: false, method: "unavailable" });
+      setStatus({ available: false, method: "unavailable", isMobile: false });
     } finally {
       setDetecting(false);
     }
