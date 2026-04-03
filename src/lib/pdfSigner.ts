@@ -38,7 +38,15 @@ export interface P12ParseResult {
 /* ------------------------------------------------------------------ */
 
 export function parseP12(p12Buffer: ArrayBuffer, password: string): P12ParseResult {
-  const p12Der = forge.util.binary.raw.encode(new Uint8Array(p12Buffer));
+  // Use chunked conversion to avoid stack overflow with large .p12 files
+  const bytes = new Uint8Array(p12Buffer);
+  const CHUNK = 8192;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK, bytes.length));
+    parts.push(String.fromCharCode.apply(null, slice as unknown as number[]));
+  }
+  const p12Der = parts.join("");
   const p12Asn1 = forge.asn1.fromDer(p12Der);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, password);
 
