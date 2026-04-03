@@ -459,7 +459,7 @@ const PlansModule = () => {
                     <form onSubmit={handleUploadVersion} className="space-y-4 mt-4">
                       <div className="space-y-2">
                         <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Archivo (PDF, DWG, DXF)</Label>
-                        <Input type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.dwg,.dxf,.png,.jpg,.jpeg" onChange={(e) => { setUploadFile(e.target.files?.[0] || null); e.currentTarget.value = ""; }} required className="cursor-pointer" />
+                        <Input type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.dwg,.dxf,.png,.jpg,.jpeg" onChange={(e) => { const f = e.target.files?.[0] || null; setUploadFile(f); }} required className="cursor-pointer" />
                         <p className="text-[10px] text-muted-foreground">Solo DO y DEM pueden subir planos</p>
                       </div>
                       <div className="space-y-2">

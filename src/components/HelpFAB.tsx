@@ -7,12 +7,14 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { HelpCircle, BookOpen, MessageSquare, X, Loader2 } from "lucide-react";
+import { HelpCircle, BookOpen, MessageSquare, X, Loader2, Bot } from "lucide-react";
+import HelpChat from "@/components/HelpChat";
 
 const HelpFAB = () => {
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -77,6 +79,14 @@ const HelpFAB = () => {
           <Button
             variant="ghost"
             className="w-full justify-start gap-2 text-sm h-10"
+            onClick={() => { setShowChat(true); setOpen(false); }}
+          >
+            <Bot className="h-4 w-4 text-accent" />
+            Chat
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 text-sm h-10"
             onClick={() => setShowSupport(true)}
           >
             <MessageSquare className="h-4 w-4 text-accent" />
@@ -108,6 +118,9 @@ const HelpFAB = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* AI Chat */}
+      <HelpChat open={showChat} onOpenChange={setShowChat} />
     </>
   );
 };
