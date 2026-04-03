@@ -106,8 +106,8 @@ async function addVisualStamp(
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const stampW = 300;
-  const stampH = 100;
+  const stampW = 150;
+  const stampH = 60;
   const margin = 36;
 
   // Simple anti-overlap: bottom-right by default
