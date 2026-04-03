@@ -380,6 +380,7 @@ const SignatureDocuments = () => {
     localStorage.setItem("tektra_sign_method", method);
   };
 
+  const handleDownload = () => {
     if (!pdfBlobUrl || !selectedDocument) return;
     const a = document.createElement("a");
     a.href = pdfBlobUrl;
