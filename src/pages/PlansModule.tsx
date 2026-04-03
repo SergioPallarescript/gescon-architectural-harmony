@@ -491,7 +491,7 @@ const PlansModule = () => {
                     <span className="text-xs font-display text-success flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" />Firmado</span>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div data-tour="conformity-roles" className="flex flex-wrap gap-3">
                   {ROLES.map((role) => {
                     const signed = conformities.find((c) => c.role === role);
                     const memberWithRole = members.find((m) => m.role === role);

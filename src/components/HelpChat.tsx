@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, Loader2, Bot, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -139,7 +138,7 @@ const HelpChat = ({ open, onOpenChange }: HelpChatProps) => {
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6 min-h-0" style={{ maxHeight: "50vh" }}>
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 overscroll-contain" style={{ maxHeight: "50vh" }}>
           <div className="space-y-4 py-2">
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -168,7 +167,7 @@ const HelpChat = ({ open, onOpenChange }: HelpChatProps) => {
             )}
             <div ref={scrollRef} />
           </div>
-        </ScrollArea>
+        </div>
 
         <div className="px-6 pb-6 pt-2 border-t border-border">
           <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">

@@ -608,7 +608,7 @@ const CostsModule = () => {
 
                   {/* PDF viewer */}
                   {selectedClaim.file_url ? (
-                    <div ref={canvasContainerRef} className="overflow-y-auto max-h-[420px] rounded-lg border border-border bg-background p-2">
+                    <div data-tour="cost-preview" ref={canvasContainerRef} className="overflow-y-auto max-h-[420px] rounded-lg border border-border bg-background p-2">
                       {pdfPages.length === 0 && (
                         <div className="flex h-[400px] items-center justify-center text-sm text-muted-foreground">
                           <Loader2 className="h-5 w-5 animate-spin mr-2" /> Cargando PDF…
@@ -648,8 +648,8 @@ const CostsModule = () => {
                       </div>
                       <Tabs value={signMethod} onValueChange={handleSignMethodChange}>
                         <TabsList className="w-full">
-                          <TabsTrigger value="certificate" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Certificado digital</TabsTrigger>
-                          <TabsTrigger value="manual" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Firma Manual</TabsTrigger>
+                          <TabsTrigger data-tour="cost-certificate-tab" value="certificate" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Certificado digital</TabsTrigger>
+                          <TabsTrigger data-tour="cost-manual-tab" value="manual" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Firma Manual</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="certificate" className="mt-4">
