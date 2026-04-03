@@ -645,18 +645,34 @@ const CostsModule = () => {
                         <h3 className="font-display text-sm font-semibold uppercase tracking-wider">
                           {dt === "certificacion" ? `Firma Técnica (${projectRole})` : "Firma de Aceptación (Promotor)"}
                         </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Se estampará en el PDF con hash de validación, timestamp, rol y geolocalización.
-                        </p>
                       </div>
-                      <SignatureCanvas ref={signatureRef} />
-                      <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" onClick={() => signatureRef.current?.clear()}>Limpiar firma</Button>
-                        <Button onClick={initiateSign} disabled={signing} className="gap-2 font-display text-xs uppercase tracking-wider">
-                          {signing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
-                          {signing ? "Firmando..." : "Firmar y Validar"}
-                        </Button>
-                      </div>
+                      <Tabs value={signMethod} onValueChange={handleSignMethodChange}>
+                        <TabsList className="w-full">
+                          <TabsTrigger value="certificate" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Certificado digital</TabsTrigger>
+                          <TabsTrigger value="manual" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Firma Manual</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="certificate" className="mt-4">
+                          <CertificateSignature
+                            disabled={signing}
+                            userRole={projectRole || "N/A"}
+                            onSign={handleCertSign}
+                            originalPdfBytes={originalPdfBuffer}
+                          />
+                        </TabsContent>
+
+                        <TabsContent value="manual" className="space-y-4 mt-4">
+                          <p className="text-sm text-muted-foreground">Se estampará en el PDF con hash de validación, timestamp, rol y geolocalización.</p>
+                          <SignatureCanvas ref={signatureRef} />
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" size="sm" className="text-xs" onClick={() => signatureRef.current?.clear()}>Limpiar firma</Button>
+                            <Button size="sm" onClick={initiateSign} disabled={signing} className="gap-2 font-display text-xs uppercase tracking-wider">
+                              {signing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
+                              {signing ? "Firmando..." : "Firmar y Validar"}
+                            </Button>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
                     </div>
                   )}
 
