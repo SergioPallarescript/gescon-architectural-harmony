@@ -44,6 +44,7 @@ const SignatureDocuments = () => {
   const { id: projectId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { projectRole } = useProjectRole(projectId);
   const signatureRef = useRef<SignatureCanvasHandle | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const [documents, setDocuments] = useState<SignatureDocument[]>([]);
@@ -64,6 +65,8 @@ const SignatureDocuments = () => {
   const [replacing, setReplacing] = useState(false);
   const [fiscalModalOpen, setFiscalModalOpen] = useState(false);
   const [fiscalData, setFiscalData] = useState<{ full_name: string; dni_cif: string } | null>(null);
+  const [signMethod, setSignMethod] = useState<string>(() => localStorage.getItem("tektra_sign_method") || "manual");
+  const [originalPdfBuffer, setOriginalPdfBuffer] = useState<ArrayBuffer | null>(null);
 
   const fetchDocuments = async () => {
     if (!user) return;
