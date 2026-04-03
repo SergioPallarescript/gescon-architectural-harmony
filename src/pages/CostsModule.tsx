@@ -9,7 +9,9 @@ import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import AppLayout from "@/components/AppLayout";
 import FiscalDataModal from "@/components/FiscalDataModal";
 import SignatureCanvas, { type SignatureCanvasHandle } from "@/components/SignatureCanvas";
+import CertificateSignature, { type CertSignMetadata } from "@/components/CertificateSignature";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -83,6 +85,11 @@ const CostsModule = () => {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [deleteClaim, setDeleteClaim] = useState<string | null>(null);
   const [fiscalModalOpen, setFiscalModalOpen] = useState(false);
+  const [signMethod, setSignMethod] = useState<string>(() => {
+    const saved = localStorage.getItem("tektra_sign_method");
+    return saved === "autofirma" ? "certificate" : (saved || "certificate");
+  });
+  const [originalPdfBuffer, setOriginalPdfBuffer] = useState<ArrayBuffer | null>(null);
 
   const canSubmit = isCON;
 
@@ -117,12 +124,17 @@ const CostsModule = () => {
     if (!selectedClaim?.file_url) {
       setPdfBlobUrl(c => { if (c) URL.revokeObjectURL(c); return null; });
       setPdfPages([]);
+      setOriginalPdfBuffer(null);
       return;
     }
     const load = async () => {
       const targetPath = (selectedClaim as any).signed_file_path || selectedClaim.file_url;
       const { data, error } = await supabase.storage.from("plans").download(targetPath);
       if (error || !data) { toast.error("No se pudo abrir el PDF"); return; }
+      // Store raw bytes for certificate signing
+      if (canSignHere) {
+        setOriginalPdfBuffer(await data.arrayBuffer());
+      }
       const url = URL.createObjectURL(data);
       setPdfBlobUrl(c => { if (c) URL.revokeObjectURL(c); return url; });
       await renderPdf(url);
@@ -342,6 +354,60 @@ const CostsModule = () => {
     } catch (err: any) {
       toast.error(err?.message || "Error al firmar");
     } finally { setSigning(false); }
+  };
+
+  /* ───── Certificate Sign ───── */
+  const handleCertSign = useCallback(async (signedPdfBytes: Uint8Array, metadata: CertSignMetadata) => {
+    if (!selectedClaim || !user || !projectId) return;
+    const signedAt = new Date().toISOString();
+    const signedBlob = new Blob([new Uint8Array(Array.from(signedPdfBytes))], { type: "application/pdf" });
+    const signedFile = new File([signedBlob], `firmado_${sanitizeFileName(selectedClaim.file_name || "doc.pdf")}`, { type: "application/pdf" });
+    const signedPath = `costs/${projectId}/signed/${selectedClaim.id}_${Date.now()}.pdf`;
+    const { error: upErr } = await uploadFileWithFallback({ path: signedPath, file: signedFile });
+    if (upErr) throw upErr;
+
+    const dt = (selectedClaim as any).doc_type || "certificacion";
+    const updates: any = { signed_file_path: signedPath, validation_hash: metadata.validationHash };
+    if (dt === "certificacion") {
+      if (isDEM) { updates.dem_signed_by = user.id; updates.dem_signed_at = signedAt; }
+      if (isDO) { updates.do_signed_by = user.id; updates.do_signed_at = signedAt; }
+      const demDone = isDEM ? true : !!(selectedClaim as any).dem_signed_by;
+      const doDone = isDO ? true : !!(selectedClaim as any).do_signed_by;
+      if (demDone && doDone) updates.status = "pending_payment";
+    } else if (dt === "presupuesto" && isPRO) {
+      updates.pro_signed_by = user.id;
+      updates.pro_signed_at = signedAt;
+      updates.status = "approved";
+    }
+
+    await supabase.from("cost_claims").update(updates).eq("id", selectedClaim.id);
+    await supabase.from("audit_logs").insert({
+      user_id: user.id, project_id: projectId, action: "cost_document_signed_p12",
+      details: {
+        claim_id: selectedClaim.id, hash: metadata.validationHash, role: projectRole,
+        geo_location: metadata.geo, signer_name: metadata.signerName, signer_dni: metadata.signerDni,
+        certificate_cn: metadata.certificateCN, certificate_serial: metadata.certificateSerial,
+      },
+      geo_location: metadata.geo,
+    });
+
+    // Trigger download
+    const downloadUrl = URL.createObjectURL(signedBlob);
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    a.download = `${(selectedClaim.file_name || "doc").replace(/\.pdf$/i, "")}_FIRMADO.pdf`;
+    a.click();
+    URL.revokeObjectURL(downloadUrl);
+
+    toast.success("Documento firmado con certificado digital");
+    await fetchClaims();
+    const { data: refreshed } = await supabase.from("cost_claims").select("*").eq("id", selectedClaim.id).single();
+    if (refreshed) setSelectedClaim(refreshed);
+  }, [selectedClaim, user, projectId, isDEM, isDO, isPRO, projectRole, fetchClaims]);
+
+  const handleSignMethodChange = (method: string) => {
+    setSignMethod(method);
+    localStorage.setItem("tektra_sign_method", method);
   };
 
   /* ───── Edit / Delete ───── */
@@ -579,18 +645,34 @@ const CostsModule = () => {
                         <h3 className="font-display text-sm font-semibold uppercase tracking-wider">
                           {dt === "certificacion" ? `Firma Técnica (${projectRole})` : "Firma de Aceptación (Promotor)"}
                         </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Se estampará en el PDF con hash de validación, timestamp, rol y geolocalización.
-                        </p>
                       </div>
-                      <SignatureCanvas ref={signatureRef} />
-                      <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" onClick={() => signatureRef.current?.clear()}>Limpiar firma</Button>
-                        <Button onClick={initiateSign} disabled={signing} className="gap-2 font-display text-xs uppercase tracking-wider">
-                          {signing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
-                          {signing ? "Firmando..." : "Firmar y Validar"}
-                        </Button>
-                      </div>
+                      <Tabs value={signMethod} onValueChange={handleSignMethodChange}>
+                        <TabsList className="w-full">
+                          <TabsTrigger value="certificate" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Certificado digital</TabsTrigger>
+                          <TabsTrigger value="manual" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Firma Manual</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="certificate" className="mt-4">
+                          <CertificateSignature
+                            disabled={signing}
+                            userRole={projectRole || "N/A"}
+                            onSign={handleCertSign}
+                            originalPdfBytes={originalPdfBuffer}
+                          />
+                        </TabsContent>
+
+                        <TabsContent value="manual" className="space-y-4 mt-4">
+                          <p className="text-sm text-muted-foreground">Se estampará en el PDF con hash de validación, timestamp, rol y geolocalización.</p>
+                          <SignatureCanvas ref={signatureRef} />
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" size="sm" className="text-xs" onClick={() => signatureRef.current?.clear()}>Limpiar firma</Button>
+                            <Button size="sm" onClick={initiateSign} disabled={signing} className="gap-2 font-display text-xs uppercase tracking-wider">
+                              {signing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
+                              {signing ? "Firmando..." : "Firmar y Validar"}
+                            </Button>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
                     </div>
                   )}
 
