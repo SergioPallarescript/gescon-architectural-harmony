@@ -320,9 +320,6 @@ function addSignaturePlaceholder(pdfBytes: Uint8Array): Uint8Array {
   return fixByteRange(result);
 }
 
-// Shared signer info for building the sig object
-const signer = { geo: "" };
-
 function findLastPageRef(pdf: string): string {
   // Find page objects - look for /Type /Page (not /Pages)
   const pageMatches = [...pdf.matchAll(/(\d+)\s+0\s+obj[\s\S]*?\/Type\s*\/Page(?!\s*s)\b/g)];
