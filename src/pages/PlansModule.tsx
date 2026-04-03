@@ -452,7 +452,7 @@ const PlansModule = () => {
                 )}
                 <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                   <DialogTrigger asChild>
-                    <Button className="font-display text-xs uppercase tracking-wider gap-2"><Upload className="h-4 w-4" />Subir Versión</Button>
+                    <Button data-tour="upload-version" className="font-display text-xs uppercase tracking-wider gap-2"><Upload className="h-4 w-4" />Subir Versión</Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader><DialogTitle className="font-display">Subir Nueva Versión</DialogTitle></DialogHeader>
@@ -477,13 +477,13 @@ const PlansModule = () => {
 
             {/* Conformity Signatures */}
             {latestVersion && (
-              <div className="bg-card border border-border rounded-lg p-6 mb-6 animate-fade-in">
+              <div data-tour="conformity-section" className="bg-card border border-border rounded-lg p-6 mb-6 animate-fade-in">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4" />Conformidad — Versión {latestVersion.version_number}
                   </h2>
                   {!userHasSigned && projectRole && (
-                    <Button onClick={() => setShowConfirmDialog(true)} className="font-display text-xs uppercase tracking-wider gap-2 bg-success hover:bg-success/90 text-success-foreground">
+                    <Button data-tour="confirm-conformity" onClick={() => setShowConfirmDialog(true)} className="font-display text-xs uppercase tracking-wider gap-2 bg-success hover:bg-success/90 text-success-foreground">
                       <CheckCircle2 className="h-4 w-4" />Confirmar Conformidad
                     </Button>
                   )}

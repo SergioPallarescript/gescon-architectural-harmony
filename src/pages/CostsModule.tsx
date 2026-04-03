@@ -583,10 +583,10 @@ const CostsModule = () => {
                       <p className="text-xs sm:text-sm text-muted-foreground truncate">{selectedClaim.file_name}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <Button variant="outline" size="sm" onClick={handleDownload} className="gap-1.5 text-xs">
+                      <Button data-tour="cost-download" variant="outline" size="sm" onClick={handleDownload} className="gap-1.5 text-xs">
                         <Download className="h-3.5 w-3.5" /> Descargar
                       </Button>
-                      <Button variant="outline" size="sm" onClick={handleOpenExternal} className="gap-1.5 text-xs">
+                      <Button data-tour="cost-open" variant="outline" size="sm" onClick={handleOpenExternal} className="gap-1.5 text-xs">
                         <ExternalLink className="h-3.5 w-3.5" /> Abrir
                       </Button>
                       <span className={`inline-flex items-center rounded px-2 py-1 text-[10px] font-display uppercase tracking-widest ${st.color}`}>
@@ -640,7 +640,7 @@ const CostsModule = () => {
 
                   {/* Signature panel */}
                   {canSignHere && (
-                    <div className="space-y-4 rounded-lg border border-border bg-background p-4">
+                    <div data-tour="cost-signature-panel" className="space-y-4 rounded-lg border border-border bg-background p-4">
                       <div>
                         <h3 className="font-display text-sm font-semibold uppercase tracking-wider">
                           {dt === "certificacion" ? `Firma Técnica (${projectRole})` : "Firma de Aceptación (Promotor)"}
