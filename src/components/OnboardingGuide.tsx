@@ -37,17 +37,24 @@ const OnboardingGuide = () => {
         return;
       }
 
-      const joyrideSteps: Step[] = (data as any[]).map(s => {
-        const isBodyTarget = !s.target_element || s.target_element === "body";
-        return {
-          target: isBodyTarget ? "body" : s.target_element,
-          title: s.title,
-          content: s.content,
-          disableBeacon: true,
-          placement: isBodyTarget ? ("center" as const) : ("auto" as const),
-          floaterProps: { disableAnimation: true },
-        };
-      });
+      const joyrideSteps: Step[] = (data as any[])
+        .filter(s => {
+          // Always include body/center steps
+          if (!s.target_element || s.target_element === "body") return true;
+          // Only include steps whose DOM target exists
+          return !!document.querySelector(s.target_element);
+        })
+        .map(s => {
+          const isBodyTarget = !s.target_element || s.target_element === "body";
+          return {
+            target: isBodyTarget ? "body" : s.target_element,
+            title: s.title,
+            content: s.content,
+            disableBeacon: true,
+            placement: isBodyTarget ? ("center" as const) : ("auto" as const),
+            floaterProps: { disableAnimation: true },
+          };
+        });
 
       setSteps(joyrideSteps);
     };
