@@ -379,7 +379,7 @@ const SignatureDocuments = () => {
   const handleAutoFirmaSign = useCallback(async (signedPdfBytes: Uint8Array, metadata: AutoFirmaMetadata) => {
     if (!projectId || !selectedDocument || !user) return;
     const signedAt = new Date().toISOString();
-    const signedBlob = new Blob([signedPdfBytes], { type: "application/pdf" });
+    const signedBlob = new Blob([new Uint8Array(Array.from(signedPdfBytes))], { type: "application/pdf" });
     const signedFile = new File([signedBlob], `firmado_${sanitizeFileName(selectedDocument.original_file_name)}`, { type: "application/pdf" });
     const signedPath = `signature-documents/${projectId}/signed/${selectedDocument.id}_${Date.now()}.pdf`;
     const { error: uploadError } = await uploadFileWithFallback({ path: signedPath, file: signedFile });
