@@ -252,7 +252,7 @@ function addSignaturePlaceholder(pdfBytes: Uint8Array, geo: string): Uint8Array 
     `/Contents <${contentsHex}>`,
     `/M (D:${dateStr})`,
     `/Reason (Firma digital TEKTRA)`,
-    `/Location (${signer.geo || "ES"})`,
+    `/Location (${geo || "ES"})`,
     `>>`,
     `endobj`,
   ].join("\n");
