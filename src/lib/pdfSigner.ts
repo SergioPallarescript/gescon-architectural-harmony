@@ -38,7 +38,15 @@ export interface P12ParseResult {
 /* ------------------------------------------------------------------ */
 
 export function parseP12(p12Buffer: ArrayBuffer, password: string): P12ParseResult {
-  const p12Der = forge.util.binary.raw.encode(new Uint8Array(p12Buffer));
+  // Use chunked conversion to avoid stack overflow with large .p12 files
+  const bytes = new Uint8Array(p12Buffer);
+  const CHUNK = 8192;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK, bytes.length));
+    parts.push(String.fromCharCode.apply(null, slice as unknown as number[]));
+  }
+  const p12Der = parts.join("");
   const p12Asn1 = forge.asn1.fromDer(p12Der);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, password);
 
@@ -424,11 +432,24 @@ function findByteRange(pdfBytes: Uint8Array): {
 /*  PKCS#7 generation                                                  */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Convert Uint8Array to a forge-compatible binary string without blowing the stack.
+ * String.fromCharCode.apply() crashes with large arrays, so we chunk it.
+ */
+function uint8ToBinaryString(bytes: Uint8Array): string {
+  const CHUNK = 8192;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    const slice = bytes.subarray(i, Math.min(i + CHUNK, bytes.length));
+    parts.push(String.fromCharCode.apply(null, slice as unknown as number[]));
+  }
+  return parts.join("");
+}
+
 function generatePKCS7(dataToSign: Uint8Array, p12: P12ParseResult): string {
   // Build the PKCS#7 signed data with the actual ByteRange content
   const p7Final = forge.pkcs7.createSignedData();
-  p7Final.content = forge.util.createBuffer(forge.util.binary.raw.encode(dataToSign));
-
+  p7Final.content = forge.util.createBuffer(uint8ToBinaryString(dataToSign));
   p7Final.addCertificate(p12.certificate);
   for (const cert of p12.chain) {
     p7Final.addCertificate(cert);

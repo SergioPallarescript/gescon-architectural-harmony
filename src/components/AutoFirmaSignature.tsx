@@ -39,7 +39,7 @@ export default function AutoFirmaSignature({ disabled, onSign, originalPdfBytes 
         toast.success("AutoFirma detectado en el sistema");
       }
     } catch {
-      setStatus({ available: false, method: "unavailable" });
+      setStatus({ available: false, method: "unavailable", isMobile: false });
     } finally {
       setDetecting(false);
     }
@@ -77,11 +77,17 @@ export default function AutoFirmaSignature({ disabled, onSign, originalPdfBytes 
         });
       } else {
         // Launch protocol handler
-        launchAutoFirmaProtocol(pdfBase64);
-        toast.info(
-          "Se ha abierto AutoFirma. Firma el documento en la ventana de AutoFirma y luego sube el PDF firmado manualmente.",
-          { duration: 10000 }
-        );
+        const launched = launchAutoFirmaProtocol(pdfBase64);
+        if (!launched) {
+          toast.error("El PDF es demasiado grande para firmar con el protocolo AutoFirma. Usa la pestaña 'Certificado .P12'.");
+        } else {
+          toast.info(
+            status?.isMobile
+              ? "Se está abriendo la app AutoFirma. Firma el documento en la app y luego sube el PDF firmado manualmente."
+              : "Se ha abierto AutoFirma. Firma el documento en la ventana de AutoFirma y luego sube el PDF firmado manualmente.",
+            { duration: 10000 }
+          );
+        }
         setSigning(false);
         return;
       }
@@ -129,18 +135,32 @@ export default function AutoFirmaSignature({ disabled, onSign, originalPdfBytes 
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-warning">
               <AlertTriangle className="h-4 w-4" />
-              <span>AutoFirma no detectado en este dispositivo</span>
+              <span>
+                {status?.isMobile
+                  ? "AutoFirma: se intentará abrir la app"
+                  : "AutoFirma no detectado en este dispositivo"}
+              </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Puedes intentar abrir AutoFirma mediante el protocolo del sistema, o{" "}
-              <a
-                href="https://firmaelectronica.gob.es/Home/Descargas.html"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline inline-flex items-center gap-0.5"
-              >
-                descargar AutoFirma <ExternalLink className="h-3 w-3" />
-              </a>
+              {status?.isMobile ? (
+                <>
+                  Asegúrate de tener la app <strong>AutoFirma</strong> instalada en tu dispositivo.
+                  En Android puedes descargarla desde Google Play.
+                  En iOS no está disponible; usa la pestaña <strong>Certificado .P12</strong>.
+                </>
+              ) : (
+                <>
+                  Puedes intentar abrir AutoFirma mediante el protocolo del sistema, o{" "}
+                  <a
+                    href="https://firmaelectronica.gob.es/Home/Descargas.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline inline-flex items-center gap-0.5"
+                  >
+                    descargar AutoFirma <ExternalLink className="h-3 w-3" />
+                  </a>
+                </>
+              )}
             </p>
           </div>
         )}
