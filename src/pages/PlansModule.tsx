@@ -483,7 +483,7 @@ const PlansModule = () => {
                     <ShieldCheck className="h-4 w-4" />Conformidad — Versión {latestVersion.version_number}
                   </h2>
                   {!userHasSigned && projectRole && (
-                    <Button onClick={() => setShowConfirmDialog(true)} className="font-display text-xs uppercase tracking-wider gap-2 bg-success hover:bg-success/90 text-success-foreground">
+                    <Button data-tour="confirm-conformity" onClick={() => setShowConfirmDialog(true)} className="font-display text-xs uppercase tracking-wider gap-2 bg-success hover:bg-success/90 text-success-foreground">
                       <CheckCircle2 className="h-4 w-4" />Confirmar Conformidad
                     </Button>
                   )}

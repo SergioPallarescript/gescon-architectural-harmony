@@ -640,7 +640,7 @@ const CostsModule = () => {
 
                   {/* Signature panel */}
                   {canSignHere && (
-                    <div className="space-y-4 rounded-lg border border-border bg-background p-4">
+                    <div data-tour="cost-signature-panel" className="space-y-4 rounded-lg border border-border bg-background p-4">
                       <div>
                         <h3 className="font-display text-sm font-semibold uppercase tracking-wider">
                           {dt === "certificacion" ? `Firma Técnica (${projectRole})` : "Firma de Aceptación (Promotor)"}
