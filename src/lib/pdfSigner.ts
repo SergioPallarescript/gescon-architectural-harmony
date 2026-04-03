@@ -492,7 +492,7 @@ function generatePKCS7(dataToSign: Uint8Array, p12: P12ParseResult): string {
 /* ------------------------------------------------------------------ */
 
 export async function computeSHA256(data: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", data);
+  const digest = await crypto.subtle.digest("SHA-256", data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer);
   return Array.from(new Uint8Array(digest))
     .map((v) => v.toString(16).padStart(2, "0"))
     .join("")
