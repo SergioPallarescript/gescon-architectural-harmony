@@ -1,23 +1,69 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectRole } from "@/hooks/useProjectRole";
 
 const OnboardingGuide = () => {
   const { user, profile } = useAuth();
   const location = useLocation();
+  const { id: projectId } = useParams<{ id: string }>();
+  const { projectRole } = useProjectRole(projectId);
   const [steps, setSteps] = useState<Step[]>([]);
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const hasMarkedSeen = useRef(false);
+  const rawStepsRef = useRef<any[]>([]);
+  const autoStartedKey = useRef<string | null>(null);
+  const pendingManualStart = useRef(false);
+  const lastStepSignature = useRef("");
 
   const normalizeRoute = useCallback((path: string) => {
     return path.replace(/\/project\/[0-9a-f-]{36}/, "/project/:id");
   }, []);
 
   const pageRoute = normalizeRoute(location.pathname);
-  const userRole = profile?.role as string | undefined;
+  const userRole = (pageRoute.startsWith("/project/:id") ? projectRole : undefined) ?? (profile?.role as string | undefined);
+
+  const syncVisibleSteps = useCallback((sourceSteps: any[]) => {
+    const joyrideSteps: Step[] = sourceSteps
+      .filter((s) => {
+        if (!s.target_element || s.target_element === "body") return true;
+        return !!document.querySelector(s.target_element);
+      })
+      .map((s) => {
+        const isBodyTarget = !s.target_element || s.target_element === "body";
+        return {
+          target: isBodyTarget ? "body" : s.target_element,
+          title: s.title,
+          content: s.content,
+          disableBeacon: true,
+          placement: isBodyTarget ? ("center" as const) : ("auto" as const),
+          floaterProps: { disableAnimation: true },
+        };
+      });
+
+    const signature = joyrideSteps
+      .map((step) => `${String(step.target)}|${String(step.title)}|${typeof step.content === "string" ? step.content : ""}`)
+      .join("::");
+
+    if (signature !== lastStepSignature.current) {
+      lastStepSignature.current = signature;
+      setSteps(joyrideSteps);
+    }
+  }, []);
+
+  const startGuide = useCallback(() => {
+    if (steps.length === 0) {
+      pendingManualStart.current = true;
+      return;
+    }
+
+    pendingManualStart.current = false;
+    setStepIndex(0);
+    setRun(true);
+  }, [steps.length]);
 
   // Load steps from DB
   useEffect(() => {
@@ -33,39 +79,47 @@ const OnboardingGuide = () => {
         .order("step_order");
 
       if (!data || data.length === 0) {
+        rawStepsRef.current = [];
+        lastStepSignature.current = "";
         setSteps([]);
         return;
       }
 
-      const joyrideSteps: Step[] = (data as any[])
-        .filter(s => {
-          // Always include body/center steps
-          if (!s.target_element || s.target_element === "body") return true;
-          // Only include steps whose DOM target exists
-          return !!document.querySelector(s.target_element);
-        })
-        .map(s => {
-          const isBodyTarget = !s.target_element || s.target_element === "body";
-          return {
-            target: isBodyTarget ? "body" : s.target_element,
-            title: s.title,
-            content: s.content,
-            disableBeacon: true,
-            placement: isBodyTarget ? ("center" as const) : ("auto" as const),
-            floaterProps: { disableAnimation: true },
-          };
-        });
-
-      setSteps(joyrideSteps);
+      rawStepsRef.current = data as any[];
+      syncVisibleSteps(rawStepsRef.current);
     };
 
     loadSteps();
-  }, [userRole, pageRoute]);
+  }, [userRole, pageRoute, syncVisibleSteps]);
+
+  useEffect(() => {
+    if (rawStepsRef.current.length === 0) return;
+
+    let frame = 0;
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => syncVisibleSteps(rawStepsRef.current));
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [pageRoute, syncVisibleSteps, userRole]);
 
   // Check first-time visit — auto-start only once
   useEffect(() => {
     if (!user || steps.length === 0) return;
     hasMarkedSeen.current = false;
+
+    const routeKey = `${user.id}:${pageRoute}`;
+    if (autoStartedKey.current === routeKey) return;
 
     const checkFirstTime = async () => {
       const { data } = await supabase
@@ -75,17 +129,24 @@ const OnboardingGuide = () => {
         .eq("page_route", pageRoute)
         .maybeSingle();
 
+      autoStartedKey.current = routeKey;
+
       if (!data) {
-        // Wait for DOM elements to render
         setTimeout(() => {
           setStepIndex(0);
           setRun(true);
-        }, 1200);
+        }, 250);
       }
     };
 
     checkFirstTime();
   }, [user, steps.length, pageRoute]);
+
+  useEffect(() => {
+    if (steps.length > 0 && pendingManualStart.current) {
+      startGuide();
+    }
+  }, [steps.length, startGuide]);
 
   // Mark page as seen
   const markAsSeen = useCallback(async () => {
@@ -120,15 +181,10 @@ const OnboardingGuide = () => {
 
   // Manual start from HelpFAB
   useEffect(() => {
-    const handler = () => {
-      if (steps.length > 0) {
-        setStepIndex(0);
-        setRun(true);
-      }
-    };
+    const handler = () => startGuide();
     window.addEventListener("start-onboarding-guide", handler);
     return () => window.removeEventListener("start-onboarding-guide", handler);
-  }, [steps]);
+  }, [startGuide]);
 
   if (steps.length === 0) return null;
 
