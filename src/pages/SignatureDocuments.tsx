@@ -6,11 +6,14 @@ import { ArrowLeft, CheckCircle2, Download, ExternalLink, FileSignature, Loader2
 import AppLayout from "@/components/AppLayout";
 import FiscalDataModal from "@/components/FiscalDataModal";
 import SignatureCanvas, { type SignatureCanvasHandle } from "@/components/SignatureCanvas";
+import CertificateSignature, { type CertSignMetadata } from "@/components/CertificateSignature";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectRole } from "@/hooks/useProjectRole";
 import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import { toast } from "sonner";
 import { notifyUser } from "@/lib/notifications";
@@ -41,6 +44,7 @@ const SignatureDocuments = () => {
   const { id: projectId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { projectRole } = useProjectRole(projectId);
   const signatureRef = useRef<SignatureCanvasHandle | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const [documents, setDocuments] = useState<SignatureDocument[]>([]);
@@ -61,6 +65,8 @@ const SignatureDocuments = () => {
   const [replacing, setReplacing] = useState(false);
   const [fiscalModalOpen, setFiscalModalOpen] = useState(false);
   const [fiscalData, setFiscalData] = useState<{ full_name: string; dni_cif: string } | null>(null);
+  const [signMethod, setSignMethod] = useState<string>(() => localStorage.getItem("tektra_sign_method") || "manual");
+  const [originalPdfBuffer, setOriginalPdfBuffer] = useState<ArrayBuffer | null>(null);
 
   const fetchDocuments = async () => {
     if (!user) return;
@@ -121,12 +127,17 @@ const SignatureDocuments = () => {
     if (!selectedDocument) {
       setPdfBlobUrl((c) => { if (c) URL.revokeObjectURL(c); return null; });
       setPdfPages([]);
+      setOriginalPdfBuffer(null);
       return;
     }
     const loadPreview = async () => {
       const targetPath = selectedDocument.signed_file_path || selectedDocument.original_file_path;
       const { data, error } = await supabase.storage.from("plans").download(targetPath);
       if (error || !data) { toast.error("No se pudo abrir el PDF"); return; }
+      // Store raw bytes for certificate signing
+      if (selectedDocument.status === "pending") {
+        setOriginalPdfBuffer(await data.arrayBuffer());
+      }
       const url = URL.createObjectURL(data);
       setPdfBlobUrl((c) => { if (c) URL.revokeObjectURL(c); return url; });
       await renderPdf(url);
@@ -302,7 +313,7 @@ const SignatureDocuments = () => {
       if (uploadError) throw uploadError;
 
       await (supabase.from("signature_documents" as any) as any)
-        .update({ status: "signed", signed_file_path: signedPath, signed_at: signedAt, validation_hash: validationHash })
+        .update({ status: "signed", signed_file_path: signedPath, signed_at: signedAt, validation_hash: validationHash, signature_type: "manual" })
         .eq("id", selectedDocument.id);
 
       await supabase.from("audit_logs").insert({
@@ -321,6 +332,52 @@ const SignatureDocuments = () => {
     } finally {
       setSigning(false);
     }
+  };
+
+  const handleCertSign = useCallback(async (signedPdfBytes: Uint8Array, metadata: CertSignMetadata) => {
+    if (!projectId || !selectedDocument || !user) return;
+    const signedAt = new Date().toISOString();
+    const signedBlob = new Blob([new Uint8Array(Array.from(signedPdfBytes))], { type: "application/pdf" });
+    const signedFile = new File([signedBlob], `firmado_${sanitizeFileName(selectedDocument.original_file_name)}`, { type: "application/pdf" });
+    const signedPath = `signature-documents/${projectId}/signed/${selectedDocument.id}_${Date.now()}.pdf`;
+    const { error: uploadError } = await uploadFileWithFallback({ path: signedPath, file: signedFile });
+    if (uploadError) throw uploadError;
+
+    await (supabase.from("signature_documents" as any) as any)
+      .update({
+        status: "signed", signed_file_path: signedPath, signed_at: signedAt,
+        validation_hash: metadata.validationHash, signature_type: "p12",
+        certificate_cn: metadata.certificateCN, certificate_serial: metadata.certificateSerial,
+      })
+      .eq("id", selectedDocument.id);
+
+    await supabase.from("audit_logs").insert({
+      user_id: user.id, project_id: projectId,
+      action: "signature_document_signed_p12",
+      details: {
+        document_id: selectedDocument.id, hash: metadata.validationHash,
+        geo_location: metadata.geo, signer_name: metadata.signerName, signer_dni: metadata.signerDni,
+        certificate_cn: metadata.certificateCN, certificate_serial: metadata.certificateSerial,
+      },
+      geo_location: metadata.geo,
+    });
+
+    // Trigger download
+    const downloadUrl = URL.createObjectURL(signedBlob);
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    a.download = `${selectedDocument.original_file_name.replace(/\.pdf$/i, "")}_FIRMADO.pdf`;
+    a.click();
+    URL.revokeObjectURL(downloadUrl);
+
+    toast.success("Documento firmado con certificado digital");
+    await fetchDocuments();
+    setSelectedDocument(null);
+  }, [projectId, selectedDocument, user]);
+
+  const handleSignMethodChange = (method: string) => {
+    setSignMethod(method);
+    localStorage.setItem("tektra_sign_method", method);
   };
 
   const handleDownload = () => {
@@ -483,18 +540,33 @@ const SignatureDocuments = () => {
 
                 {selectedDocument.recipient_id === user?.id && selectedDocument.status === "pending" ? (
                   <div className="space-y-4 rounded-lg border border-border bg-background p-4">
-                    <div>
-                      <h3 className="font-display text-sm font-semibold uppercase tracking-wider">Firma manual</h3>
-                      <p className="text-sm text-muted-foreground mt-1">Se estampará en el PDF con hash de validación, timestamp y geolocalización.</p>
-                    </div>
-                    <SignatureCanvas ref={signatureRef} />
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" onClick={() => signatureRef.current?.clear()}>Limpiar firma</Button>
-                      <Button onClick={initiateSign} disabled={signing} className="gap-2 font-display text-xs uppercase tracking-wider">
-                         {signing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
-                         {signing ? "Firmando..." : "Firmar y Validar"}
-                       </Button>
-                    </div>
+                    <Tabs value={signMethod} onValueChange={handleSignMethodChange}>
+                      <TabsList className="w-full">
+                        <TabsTrigger value="manual" className="flex-1 text-xs font-display uppercase tracking-wider">Firma Manual</TabsTrigger>
+                        <TabsTrigger value="certificate" className="flex-1 text-xs font-display uppercase tracking-wider">Certificado Digital</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="manual" className="space-y-4 mt-4">
+                        <p className="text-sm text-muted-foreground">Se estampará en el PDF con hash de validación, timestamp y geolocalización.</p>
+                        <SignatureCanvas ref={signatureRef} />
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" onClick={() => signatureRef.current?.clear()}>Limpiar firma</Button>
+                          <Button onClick={initiateSign} disabled={signing} className="gap-2 font-display text-xs uppercase tracking-wider">
+                            {signing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
+                            {signing ? "Firmando..." : "Firmar y Validar"}
+                          </Button>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="certificate" className="mt-4">
+                        <CertificateSignature
+                          disabled={signing}
+                          userRole={projectRole || "N/A"}
+                          onSign={handleCertSign}
+                          originalPdfBytes={originalPdfBuffer}
+                        />
+                      </TabsContent>
+                    </Tabs>
                   </div>
                 ) : selectedDocument.validation_hash ? (
                   <div className="rounded-lg border border-success/20 bg-success/5 p-4 space-y-1">
