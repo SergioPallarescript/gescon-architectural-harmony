@@ -313,7 +313,7 @@ const SignatureDocuments = () => {
       if (uploadError) throw uploadError;
 
       await (supabase.from("signature_documents" as any) as any)
-        .update({ status: "signed", signed_file_path: signedPath, signed_at: signedAt, validation_hash: validationHash })
+        .update({ status: "signed", signed_file_path: signedPath, signed_at: signedAt, validation_hash: validationHash, signature_type: "manual" })
         .eq("id", selectedDocument.id);
 
       await supabase.from("audit_logs").insert({
