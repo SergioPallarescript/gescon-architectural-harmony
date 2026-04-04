@@ -544,11 +544,11 @@ const SignatureDocuments = () => {
                 </div>
 
                 {selectedDocument.recipient_id === user?.id && selectedDocument.status === "pending" ? (
-                  <div className="space-y-4 rounded-lg border border-border bg-background p-4">
+                  <div data-tour="sig-signature-panel" className="space-y-4 rounded-lg border border-border bg-background p-4">
                     <Tabs value={signMethod} onValueChange={handleSignMethodChange}>
                       <TabsList className="w-full">
-                        <TabsTrigger value="certificate" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Certificado digital</TabsTrigger>
-                        <TabsTrigger value="manual" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Firma Manual</TabsTrigger>
+                        <TabsTrigger data-tour="sig-certificate-tab" value="certificate" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Certificado digital</TabsTrigger>
+                        <TabsTrigger data-tour="sig-manual-tab" value="manual" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Firma Manual</TabsTrigger>
                       </TabsList>
 
                       <TabsContent value="certificate" className="mt-4">
