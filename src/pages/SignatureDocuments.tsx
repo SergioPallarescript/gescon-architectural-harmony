@@ -429,11 +429,11 @@ const SignatureDocuments = () => {
             </div>
 
             <form data-tour="send-signature" onSubmit={handleCreateDocument} className="rounded-lg border border-border bg-card p-4 space-y-4">
-              <div className="space-y-2">
+              <div data-tour="sig-title" className="space-y-2">
                 <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Título</Label>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Acta de recepción parcial" required />
               </div>
-              <div className="space-y-2">
+              <div data-tour="sig-recipient" className="space-y-2">
                 <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Destinatario</Label>
                 <select value={recipientId} onChange={(e) => setRecipientId(e.target.value)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" required>
@@ -443,7 +443,7 @@ const SignatureDocuments = () => {
                   ))}
                 </select>
               </div>
-              <div className="space-y-2">
+              <div data-tour="sig-file" className="space-y-2">
                 <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">PDF</Label>
                 <Input type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} required />
               </div>
@@ -521,7 +521,7 @@ const SignatureDocuments = () => {
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">{selectedDocument.original_file_name}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Button variant="outline" size="sm" onClick={handleDownload} className="gap-1.5 text-xs">
+                    <Button data-tour="sig-download" variant="outline" size="sm" onClick={handleDownload} className="gap-1.5 text-xs">
                       <Download className="h-3.5 w-3.5" /> Descargar
                     </Button>
                     <Button variant="outline" size="sm" onClick={handleOpenExternal} className="gap-1.5 text-xs">
@@ -535,7 +535,7 @@ const SignatureDocuments = () => {
                   </div>
                 </div>
 
-                <div ref={canvasContainerRef} className="overflow-y-auto max-h-[420px] rounded-lg border border-border bg-background p-2">
+                <div data-tour="sig-preview" ref={canvasContainerRef} className="overflow-y-auto max-h-[420px] rounded-lg border border-border bg-background p-2">
                   {pdfPages.length === 0 && (
                     <div className="flex h-[400px] items-center justify-center text-sm text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin mr-2" /> Cargando PDF…
@@ -544,11 +544,11 @@ const SignatureDocuments = () => {
                 </div>
 
                 {selectedDocument.recipient_id === user?.id && selectedDocument.status === "pending" ? (
-                  <div className="space-y-4 rounded-lg border border-border bg-background p-4">
+                  <div data-tour="sig-signature-panel" className="space-y-4 rounded-lg border border-border bg-background p-4">
                     <Tabs value={signMethod} onValueChange={handleSignMethodChange}>
                       <TabsList className="w-full">
-                        <TabsTrigger value="certificate" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Certificado digital</TabsTrigger>
-                        <TabsTrigger value="manual" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Firma Manual</TabsTrigger>
+                        <TabsTrigger data-tour="sig-certificate-tab" value="certificate" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Certificado digital</TabsTrigger>
+                        <TabsTrigger data-tour="sig-manual-tab" value="manual" className="flex-1 text-[10px] sm:text-xs font-display uppercase tracking-wider">Firma Manual</TabsTrigger>
                       </TabsList>
 
                       <TabsContent value="certificate" className="mt-4">
