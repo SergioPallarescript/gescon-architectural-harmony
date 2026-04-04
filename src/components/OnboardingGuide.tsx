@@ -193,6 +193,8 @@ const OnboardingGuide = () => {
         last: "Finalizar",
         next: "Siguiente",
         skip: "Saltar guía",
+        // @ts-ignore – react-joyride supports this undocumented key
+        progress: "Paso {step} de {steps}",
       }}
       styles={{
         options: {
