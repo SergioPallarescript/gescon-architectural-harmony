@@ -1,8 +1,73 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
+import Joyride, { CallBackProps, STATUS, Step, TooltipRenderProps } from "react-joyride";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+
+const CustomTooltip = ({
+  continuous,
+  index,
+  step,
+  size,
+  backProps,
+  closeProps,
+  primaryProps,
+  skipProps,
+  isLastStep,
+}: TooltipRenderProps) => (
+  <div
+    style={{
+      backgroundColor: "#fff",
+      borderRadius: "0.75rem",
+      padding: "1.25rem",
+      maxWidth: 420,
+      boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+      fontSize: "0.875rem",
+      color: "#1f1f1f",
+    }}
+  >
+    {step.title && (
+      <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "0.5rem" }}>
+        {step.title}
+      </div>
+    )}
+    <div style={{ marginBottom: "1rem" }}>{step.content}</div>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <button
+        {...skipProps}
+        style={{ color: "#999", fontSize: "0.75rem", background: "none", border: "none", cursor: "pointer" }}
+      >
+        Saltar guía
+      </button>
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        {index > 0 && (
+          <button
+            {...backProps}
+            style={{ color: "#666", fontSize: "0.8rem", background: "none", border: "none", cursor: "pointer" }}
+          >
+            Anterior
+          </button>
+        )}
+        {continuous && (
+          <button
+            {...primaryProps}
+            style={{
+              backgroundColor: "hsl(150, 45%, 40%)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "0.375rem",
+              fontSize: "0.8rem",
+              padding: "0.5rem 1.25rem",
+              cursor: "pointer",
+            }}
+          >
+            {isLastStep ? "Finalizar" : `Siguiente (Paso ${index + 1} de ${size})`}
+          </button>
+        )}
+      </div>
+    </div>
+  </div>
+);
 
 interface DbStep {
   id: string;
