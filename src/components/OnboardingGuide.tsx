@@ -22,6 +22,7 @@ const OnboardingGuide = () => {
   const hasMarkedSeen = useRef(false);
   const observerRef = useRef<MutationObserver | null>(null);
   const autoStarted = useRef(false);
+  const waitingForMore = useRef(false);
 
   const normalizeRoute = useCallback((path: string) => {
     return path.replace(/\/project\/[0-9a-f-]{36}/, "/project/:id");
@@ -85,8 +86,16 @@ const OnboardingGuide = () => {
     const updateVisible = () => {
       const next = computeVisibleSteps(allSteps);
       setVisibleSteps(prev => {
+        const grew = next.length > prev.length;
+        if (grew && waitingForMore.current) {
+          // New steps appeared — resume the guide from where we left off
+          waitingForMore.current = false;
+          setTimeout(() => {
+            setStepIndex(prev.length); // continue from the first new step
+            setRun(true);
+          }, 600);
+        }
         if (prev.length !== next.length) return next;
-        // Check if targets changed
         const changed = prev.some((p, i) => (p.target as string) !== (next[i]?.target as string));
         return changed ? next : prev;
       });
@@ -152,11 +161,20 @@ const OnboardingGuide = () => {
 
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       setRun(false);
-      await markAsSeen();
+      // Check if there are more steps in allSteps not yet visible
+      const allTargets = allSteps.map(s => s.target_element);
+      const visibleTargets = visibleSteps.map(s => s.target as string);
+      const hasMoreSteps = allTargets.some(t => t && t !== "body" && !visibleTargets.includes(t));
+      if (hasMoreSteps && status !== STATUS.SKIPPED) {
+        waitingForMore.current = true;
+      } else {
+        await markAsSeen();
+      }
     }
 
     if (action === "close") {
       setRun(false);
+      waitingForMore.current = false;
       await markAsSeen();
     }
   };
@@ -193,6 +211,8 @@ const OnboardingGuide = () => {
         last: "Finalizar",
         next: "Siguiente",
         skip: "Saltar guía",
+        // @ts-ignore – react-joyride supports this undocumented key
+        progress: "Paso {step} de {steps}",
       }}
       styles={{
         options: {
