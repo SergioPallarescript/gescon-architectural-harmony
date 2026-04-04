@@ -535,7 +535,7 @@ const SignatureDocuments = () => {
                   </div>
                 </div>
 
-                <div ref={canvasContainerRef} className="overflow-y-auto max-h-[420px] rounded-lg border border-border bg-background p-2">
+                <div data-tour="sig-preview" ref={canvasContainerRef} className="overflow-y-auto max-h-[420px] rounded-lg border border-border bg-background p-2">
                   {pdfPages.length === 0 && (
                     <div className="flex h-[400px] items-center justify-center text-sm text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin mr-2" /> Cargando PDF…
