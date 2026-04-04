@@ -153,11 +153,20 @@ const OnboardingGuide = () => {
 
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       setRun(false);
-      await markAsSeen();
+      // Check if there are more steps in allSteps not yet visible
+      const allTargets = allSteps.map(s => s.target_element);
+      const visibleTargets = visibleSteps.map(s => s.target as string);
+      const hasMoreSteps = allTargets.some(t => t && t !== "body" && !visibleTargets.includes(t));
+      if (hasMoreSteps && status !== STATUS.SKIPPED) {
+        waitingForMore.current = true;
+      } else {
+        await markAsSeen();
+      }
     }
 
     if (action === "close") {
       setRun(false);
+      waitingForMore.current = false;
       await markAsSeen();
     }
   };
