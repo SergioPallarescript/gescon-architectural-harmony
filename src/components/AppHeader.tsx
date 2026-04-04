@@ -143,7 +143,6 @@ const AppHeader = () => {
         {/* Right: Notifications */}
         <div className="relative">
           <Button
-            data-tour="notifications-bell"
             variant="ghost"
             size="icon"
             onClick={() => setShowNotifications(!showNotifications)}

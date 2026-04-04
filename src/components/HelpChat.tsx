@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, Loader2, Bot, User } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -15,9 +18,26 @@ interface HelpChatProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/help-chat`;
+const SYSTEM_CONTEXT = `Eres el asistente de ayuda de TEKTRA, una plataforma de gestión de obras de construcción en España.
+
+Tu función es ayudar a los usuarios a entender cómo usar la plataforma. Conoces estas funcionalidades:
+- **Dashboard de Proyectos**: Crear obras, invitar agentes (DO, DEM, CON, PRO, CSS).
+- **Documentación de Proyecto**: Subir y gestionar documentos base de la obra.
+- **Planos Válidos**: Subir planos con control de versiones. Solo DO y DEM suben; todos validan.
+- **Cerebro de Obra**: IA que responde preguntas sobre la memoria y mediciones del proyecto.
+- **Metro Digital**: Herramienta para medir distancias y áreas sobre planos PDF.
+- **Libro de Órdenes**: Solo DEM registra órdenes de ejecución.
+- **Libro de Incidencias**: Solo CSS registra incidencias de seguridad.
+- **Validación Económica**: Constructor sube certificaciones; DO y DEM firman técnicamente; Promotor autoriza pago.
+- **Docs Finales (CFO)**: Certificado final de obra con 16 puntos de control.
+- **Diagrama Gantt**: Cronograma visual de hitos de obra.
+- **Firma Digital**: Firma con certificado digital (.p12/.pfx) o firma manual con canvas.
+- **Notificaciones**: Campana de alertas con notificaciones push.
+
+Responde siempre en español, de forma concisa y práctica. Si no conoces algo, di que contacten con soporte.`;
 
 const HelpChat = ({ open, onOpenChange }: HelpChatProps) => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,87 +61,20 @@ const HelpChat = ({ open, onOpenChange }: HelpChatProps) => {
     setInput("");
     setLoading(true);
 
-    let assistantSoFar = "";
-
-    const upsertAssistant = (chunk: string) => {
-      assistantSoFar += chunk;
-      const content = assistantSoFar;
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant" && prev.length > updated.length) {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content } : m));
-        }
-        return [...prev.slice(0, updated.length), { role: "assistant", content }];
-      });
-    };
-
     try {
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
+      const { data: session } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke("brain-chat", {
+        body: {
           messages: updated.map(m => ({ role: m.role, content: m.content })),
-        }),
+          projectContext: SYSTEM_CONTEXT,
+          projectId: null,
+        },
+        headers: { Authorization: `Bearer ${session.session?.access_token}` },
       });
 
-      if (!resp.ok) {
-        const errData = await resp.json().catch(() => ({}));
-        throw new Error(errData.error || "Error del asistente");
-      }
-
-      if (!resp.body) throw new Error("No stream");
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) upsertAssistant(content);
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
-      }
-
-      // flush remaining
-      if (textBuffer.trim()) {
-        for (let raw of textBuffer.split("\n")) {
-          if (!raw) continue;
-          if (raw.endsWith("\r")) raw = raw.slice(0, -1);
-          if (!raw.startsWith("data: ")) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) upsertAssistant(content);
-          } catch { /* ignore */ }
-        }
-      }
-
-      if (!assistantSoFar) {
-        upsertAssistant("No he podido procesar tu consulta. Inténtalo de nuevo.");
-      }
+      if (error) throw error;
+      const reply = data?.reply || data?.message || "No he podido procesar tu consulta.";
+      setMessages(prev => [...prev, { role: "assistant", content: reply }]);
     } catch {
       setMessages(prev => [...prev, { role: "assistant", content: "Error al conectar con el asistente. Inténtalo de nuevo." }]);
     } finally {
@@ -138,7 +91,7 @@ const HelpChat = ({ open, onOpenChange }: HelpChatProps) => {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 overscroll-contain" style={{ maxHeight: "50vh" }}>
+        <ScrollArea className="flex-1 px-6 min-h-0" style={{ maxHeight: "50vh" }}>
           <div className="space-y-4 py-2">
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -157,7 +110,7 @@ const HelpChat = ({ open, onOpenChange }: HelpChatProps) => {
                 {msg.role === "user" && <User className="h-5 w-5 text-muted-foreground mt-1 shrink-0" />}
               </div>
             ))}
-            {loading && !messages[messages.length - 1]?.content && (
+            {loading && (
               <div className="flex gap-2">
                 <Bot className="h-5 w-5 text-accent mt-1 shrink-0" />
                 <div className="bg-secondary rounded-lg px-3 py-2">
@@ -167,7 +120,7 @@ const HelpChat = ({ open, onOpenChange }: HelpChatProps) => {
             )}
             <div ref={scrollRef} />
           </div>
-        </div>
+        </ScrollArea>
 
         <div className="px-6 pb-6 pt-2 border-t border-border">
           <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">

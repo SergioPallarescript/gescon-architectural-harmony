@@ -164,7 +164,6 @@ export default function CertificateSignature({ disabled, userRole, onSign, origi
           Certificado digital (.p12 / .pfx)
         </Label>
         <Input
-          data-tour="cert-file-input"
           ref={fileRef}
           type="file"
           accept=".p12,.pfx"
@@ -214,7 +213,6 @@ export default function CertificateSignature({ disabled, userRole, onSign, origi
       {/* Parse button */}
       {!parsedCert && !passwordRemembered && (
         <Button
-          data-tour="cert-load-button"
           variant="outline"
           onClick={handleParseCertificate}
           disabled={!p12File || !password || disabled || signing}
@@ -251,7 +249,6 @@ export default function CertificateSignature({ disabled, userRole, onSign, origi
       {/* Sign button */}
       {parsedCert && (
         <Button
-          data-tour="cert-sign-button"
           onClick={handleSign}
           disabled={!originalPdfBytes || signing || disabled}
           className="w-full gap-2 font-display text-xs uppercase tracking-wider"
