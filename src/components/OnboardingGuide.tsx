@@ -266,54 +266,19 @@ const OnboardingGuide = () => {
       stepIndex={stepIndex}
       continuous
       showSkipButton
-      showProgress
       scrollToFirstStep
       disableOverlayClose={false}
       callback={handleCallback}
-      locale={{
-        back: "Anterior",
-        close: "Cerrar",
-        last: "Finalizar",
-        next: "Siguiente",
-        skip: "Saltar guía",
-        // @ts-ignore – react-joyride supports this undocumented key
-        progress: "Paso {step} de {steps}",
-      }}
+      tooltipComponent={CustomTooltip}
       styles={{
         options: {
           primaryColor: "hsl(150, 45%, 40%)",
           zIndex: 100000,
           arrowColor: "#fff",
-          backgroundColor: "#fff",
-          textColor: "#1f1f1f",
         },
         overlay: {
           backgroundColor: "rgba(0, 0, 0, 0.6)",
           zIndex: 99999,
-        },
-        tooltip: {
-          borderRadius: "0.75rem",
-          fontSize: "0.875rem",
-          padding: "1.25rem",
-          zIndex: 100001,
-          boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-        },
-        tooltipTitle: {
-          fontWeight: 700,
-          fontSize: "1rem",
-        },
-        buttonNext: {
-          borderRadius: "0.375rem",
-          fontSize: "0.8rem",
-          padding: "0.5rem 1.25rem",
-        },
-        buttonBack: {
-          color: "#666",
-          fontSize: "0.8rem",
-        },
-        buttonSkip: {
-          color: "#999",
-          fontSize: "0.75rem",
         },
         spotlight: {
           borderRadius: "0.5rem",
