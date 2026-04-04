@@ -383,7 +383,7 @@ const PlansModule = () => {
                 {plans.map((plan, i) => (
                   <div
                     key={plan.id}
-                    className="w-full bg-card border border-border rounded-lg p-5 hover:border-foreground/20 transition-all group animate-fade-in flex items-center justify-between"
+                    className="w-full bg-card border border-border rounded-lg p-5 hover:border-foreground/20 hover:shadow-lg hover:-translate-y-0.5 transition-all group animate-fade-in flex items-center justify-between"
                     style={{ animationDelay: `${i * 60}ms` }}
                   >
                     <button
