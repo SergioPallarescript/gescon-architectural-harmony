@@ -281,6 +281,13 @@ const Dashboard = () => {
                       <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Dirección</Label>
                       <Input value={newProject.address} onChange={(e) => setNewProject({ ...newProject, address: e.target.value })} placeholder="Calle Mayor 12, Madrid" />
                     </div>
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Referencia Catastral</Label>
+                      <Input value={newProject.referencia_catastral} onChange={(e) => setNewProject({ ...newProject, referencia_catastral: e.target.value })} placeholder="Ej: 1234567AB8901C0001DE" maxLength={20} />
+                      {newProject.referencia_catastral && newProject.referencia_catastral.length !== 20 && (
+                        <p className="text-[10px] text-muted-foreground">La referencia catastral estándar tiene 20 caracteres ({newProject.referencia_catastral.length}/20)</p>
+                      )}
+                    </div>
                     <Button type="submit" className="w-full font-display text-xs uppercase tracking-wider">Crear Proyecto</Button>
                   </form>
                 </DialogContent>
