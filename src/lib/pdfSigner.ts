@@ -107,7 +107,7 @@ export function parseP12(p12Buffer: ArrayBuffer, password: string): P12ParseResu
   if (!serialNumber) {
     for (const attr of mainCert.subject.attributes) {
       if (attr.type === "2.5.4.5" || attr.name === "serialName") {
-        serialNumber = attr.value;
+        serialNumber = String(attr.value);
         break;
       }
     }
