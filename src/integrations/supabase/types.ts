@@ -502,6 +502,7 @@ export type Database = {
           severity: string
           signature_geo: string | null
           signature_hash: string | null
+          signature_image: string | null
           signature_type: string | null
           signed_at: string | null
           signed_by: string | null
@@ -525,6 +526,7 @@ export type Database = {
           severity?: string
           signature_geo?: string | null
           signature_hash?: string | null
+          signature_image?: string | null
           signature_type?: string | null
           signed_at?: string | null
           signed_by?: string | null
@@ -548,6 +550,7 @@ export type Database = {
           severity?: string
           signature_geo?: string | null
           signature_hash?: string | null
+          signature_image?: string | null
           signature_type?: string | null
           signed_at?: string | null
           signed_by?: string | null
@@ -702,6 +705,7 @@ export type Database = {
           requires_validation: boolean | null
           signature_geo: string | null
           signature_hash: string | null
+          signature_image: string | null
           signature_type: string | null
           signed_at: string | null
           signed_by: string | null
@@ -723,6 +727,7 @@ export type Database = {
           requires_validation?: boolean | null
           signature_geo?: string | null
           signature_hash?: string | null
+          signature_image?: string | null
           signature_type?: string | null
           signed_at?: string | null
           signed_by?: string | null
@@ -744,6 +749,7 @@ export type Database = {
           requires_validation?: boolean | null
           signature_geo?: string | null
           signature_hash?: string | null
+          signature_image?: string | null
           signature_type?: string | null
           signed_at?: string | null
           signed_by?: string | null
