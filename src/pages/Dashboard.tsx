@@ -150,8 +150,9 @@ const Dashboard = () => {
         name: newProject.name,
         description: newProject.description || null,
         address: newProject.address || null,
+        referencia_catastral: newProject.referencia_catastral || null,
         created_by: user.id,
-      })
+      } as any)
       .select()
       .single();
     if (error) { toast.error("Error al crear el proyecto"); return; }
