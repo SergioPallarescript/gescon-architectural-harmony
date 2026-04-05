@@ -82,34 +82,53 @@ Deno.serve(async (req) => {
       @media print {
         .page-footer { position: fixed; bottom: 0; left: 0; right: 0; }
       }
-      .stamp-digital {
+      .stamp-box {
         display: inline-block;
+        width: 48%;
         border: 2px solid #FF0000;
         background: rgba(200, 200, 200, 0.80);
-        padding: 8px 12px;
         font-size: 9px;
-        line-height: 1.5;
+        line-height: 1.4;
         color: #111;
-        margin: 4px;
-        max-width: 280px;
+        margin: 4px 1%;
         vertical-align: top;
+        box-sizing: border-box;
       }
-      .stamp-manual {
-        display: inline-block;
-        border: 2px solid #FF0000;
-        background: rgba(200, 200, 200, 0.80);
-        padding: 8px 12px;
+      .stamp-inner {
+        display: flex;
+        flex-direction: row;
+      }
+      .stamp-col1 {
+        width: 35%;
+        padding: 6px 8px;
+        border-right: 1px solid #ccc;
+      }
+      .stamp-col2 {
+        width: 30%;
+        padding: 6px 8px;
+        border-right: 1px solid #ccc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .stamp-col3 {
+        width: 35%;
+        padding: 6px 8px;
+      }
+      .stamp-label {
+        color: #6b7280;
+        font-size: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .stamp-value {
+        font-weight: 600;
         font-size: 9px;
-        line-height: 1.5;
-        color: #111;
-        margin: 4px;
-        max-width: 280px;
-        vertical-align: top;
       }
       .stamps-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 0;
         margin-top: 12px;
       }
       .page-number {
@@ -122,39 +141,42 @@ Deno.serve(async (req) => {
       }
     `;
 
-    // Helper to render a signature stamp
+    // Helper to render a signature stamp (3-column layout)
     const renderStamp = (type: string, name: string, dniCif: string, date: string, geo: string, hash: string, role: string, signatureImage?: string) => {
-      const signatureImageHtml = signatureImage
-        ? `<div style="margin:4px 0;"><img src="${signatureImage}" style="max-width:200px;max-height:60px;border:1px solid #ccc;background:#fff;padding:2px;" /></div>`
-        : "";
+      const typeLabel = type === "p12" ? "✅ CERTIFICADO DIGITAL" : "✍️ FIRMA MANUAL";
 
-      if (type === "p12") {
-        return `<div class="stamp-digital">
-          <div style="font-weight:bold;font-size:10px;margin-bottom:2px;">✅ FIRMADO DIGITALMENTE</div>
-          <div>Por: <strong>${name}</strong></div>
-          <div>DNI/NIE: <strong>${dniCif || "—"}</strong></div>
-          <div>Rol: ${role || "—"}</div>
-          <div>Fecha: ${date}</div>
-          <div>Geo: ${geo || "—"}</div>
-          ${hash ? `<div style="font-family:monospace;font-size:7px;word-break:break-all;margin-top:2px;">Hash: ${hash}</div>` : ""}
+      const col1 = `
+        <div class="stamp-col1">
+          <div class="stamp-value" style="margin-bottom:4px;">${typeLabel}</div>
+          <div><span class="stamp-label">Por:</span> <span class="stamp-value">${name}</span></div>
+          <div><span class="stamp-label">DNI/NIF:</span> <span class="stamp-value">${dniCif || "—"}</span></div>
+          <div><span class="stamp-label">Rol:</span> <span class="stamp-value">${role || "—"}</span></div>
         </div>`;
-      }
-      return `<div class="stamp-manual">
-        <div style="font-weight:bold;font-size:10px;margin-bottom:2px;">✍️ FIRMA MANUAL</div>
-        <div>Por: <strong>${name}</strong></div>
-        <div>DNI/NIE: <strong>${dniCif || "—"}</strong></div>
-        <div>Rol: ${role || "—"}</div>
-        ${signatureImageHtml}
-        <div>Fecha: ${date}</div>
-        <div>Geo: ${geo || "—"}</div>
-        ${hash ? `<div style="font-family:monospace;font-size:7px;word-break:break-all;margin-top:2px;">Hash SHA-256: ${hash}</div>` : ""}
-      </div>`;
+
+      const rubricaHtml = signatureImage && type !== "p12"
+        ? `<img src="${signatureImage}" style="max-width:90%;max-height:50px;border:1px solid #ccc;background:#fff;padding:1px;" />`
+        : (type === "p12" ? '<div style="font-size:8px;color:#059669;font-weight:bold;">FIRMA DIGITAL</div>' : '<div style="font-size:8px;color:#999;">Sin rúbrica</div>');
+
+      const col2 = `
+        <div class="stamp-col2">
+          ${rubricaHtml}
+        </div>`;
+
+      const hashShort = hash ? (hash.length > 32 ? hash.substring(0, 32) + "…" : hash) : "—";
+      const col3 = `
+        <div class="stamp-col3">
+          <div><span class="stamp-label">Fecha:</span> <span class="stamp-value">${date}</span></div>
+          <div><span class="stamp-label">Geo:</span> <span class="stamp-value">${geo || "—"}</span></div>
+          <div><span class="stamp-label">Hash:</span> <span style="font-family:monospace;font-size:7px;word-break:break-all;">${hashShort}</span></div>
+        </div>`;
+
+      return `<div class="stamp-box"><div class="stamp-inner">${col1}${col2}${col3}</div></div>`;
     };
 
     // === COVER PAGE ===
     const coverPageHtml = `
       <div style="page-break-after:always;min-height:90vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px 40px;">
-        ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" style="height:50px;margin-bottom:24px;" />` : '<p style="font-size:24px;font-weight:bold;margin-bottom:24px;">TEKTRA</p>'}
+        ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" style="height:30px;margin-bottom:24px;opacity:0.5;" />` : '<p style="font-size:18px;font-weight:bold;margin-bottom:24px;opacity:0.5;">TEKTRA</p>'}
         <h1 style="font-size:28px;font-weight:bold;letter-spacing:-0.02em;margin:0 0 8px;">LIBRO DE ÓRDENES Y ASISTENCIAS</h1>
         ${c?.libro_numero ? `<p style="font-size:16px;color:#6b7280;margin:0 0 32px;">Libro Nº ${c.libro_numero}</p>` : ""}
         
@@ -189,7 +211,7 @@ Deno.serve(async (req) => {
         .replace(/\*\*PENDIENTES:\*\*/g, '<strong style="color:#d97706;">PENDIENTES:</strong>')
         .replace(/\n/g, "<br>");
 
-      // Build stamps: author stamp + validation stamps
+      // Build stamps
       const stamps: string[] = [];
       stamps.push(renderStamp(
         order.signature_type || "manual",
@@ -254,11 +276,11 @@ Deno.serve(async (req) => {
     const hashRows = (orders || []).map((order: any) => {
       const author = profileMap[order.created_by];
       return `<tr>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:10px;text-align:center;">${order.order_number}</td>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:10px;">${order.asunto || "—"}</td>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:10px;">${author?.full_name || "—"}</td>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:8px;font-family:monospace;word-break:break-all;">${order.signature_hash || "—"}</td>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:10px;text-align:center;">${order.signature_type === "p12" ? "Cert. Digital" : "Manual"}</td>
+        <td style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:center;vertical-align:middle;height:36px;">${order.order_number}</td>
+        <td style="padding:8px;border:1px solid #ddd;font-size:10px;vertical-align:middle;">${order.asunto || "—"}</td>
+        <td style="padding:8px;border:1px solid #ddd;font-size:10px;vertical-align:middle;">${author?.full_name || "—"}</td>
+        <td style="padding:8px;border:1px solid #ddd;font-size:8px;font-family:monospace;word-break:break-all;vertical-align:middle;">${order.signature_hash || "—"}</td>
+        <td style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:center;vertical-align:middle;">${order.signature_type === "p12" ? "Cert. Digital" : "Manual"}</td>
       </tr>`;
     }).join("");
 
@@ -268,11 +290,11 @@ Deno.serve(async (req) => {
         <p style="font-size:10px;color:#6b7280;margin:0 0 16px;">Hashes SHA-256 de integridad para verificación pericial</p>
         <table style="width:100%;border-collapse:collapse;flex:1;">
           <tr>
-            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;text-align:center;background:#f9fafb;">Nº</th>
-            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;text-align:left;background:#f9fafb;">Asunto</th>
-            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;text-align:left;background:#f9fafb;">Firmante</th>
-            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;text-align:left;background:#f9fafb;">Hash SHA-256</th>
-            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;text-align:center;background:#f9fafb;">Tipo</th>
+            <th style="padding:8px;border:1px solid #ddd;font-size:9px;text-align:center;background:#f9fafb;vertical-align:middle;">Nº</th>
+            <th style="padding:8px;border:1px solid #ddd;font-size:9px;text-align:left;background:#f9fafb;vertical-align:middle;">Asunto</th>
+            <th style="padding:8px;border:1px solid #ddd;font-size:9px;text-align:left;background:#f9fafb;vertical-align:middle;">Firmante</th>
+            <th style="padding:8px;border:1px solid #ddd;font-size:9px;text-align:left;background:#f9fafb;vertical-align:middle;">Hash SHA-256</th>
+            <th style="padding:8px;border:1px solid #ddd;font-size:9px;text-align:center;background:#f9fafb;vertical-align:middle;">Tipo</th>
           </tr>
           ${hashRows}
         </table>

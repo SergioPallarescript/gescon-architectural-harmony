@@ -96,9 +96,12 @@ const AdminPanel = () => {
     }));
 
     // If the creator is not in project_members, add as virtual (read-only) entry
+    // If they ARE in project_members, mark them as creator so they can't be deleted
     if (project?.created_by) {
-      const creatorInMembers = allMembers.some((m: any) => m.user_id === project.created_by);
-      if (!creatorInMembers) {
+      const creatorIdx = allMembers.findIndex((m: any) => m.user_id === project.created_by);
+      if (creatorIdx >= 0) {
+        allMembers[creatorIdx] = { ...allMembers[creatorIdx], _isCreator: true };
+      } else {
         const creatorProfile = profilesMap[project.created_by];
         if (creatorProfile) {
           allMembers = [
@@ -383,7 +386,8 @@ const AdminPanel = () => {
                     const name = member.profiles?.full_name || email;
                     const currentRole = member.role as AppRole;
                     const secondaryRole = member.secondary_role as string | null;
-                    const isVirtualCreator = member._isCreator === true;
+                    const isVirtualCreator = member.id?.toString().startsWith("creator-");
+                    const isCreator = member._isCreator === true;
 
                     return (
                       <TableRow key={member.id}>
@@ -449,7 +453,7 @@ const AdminPanel = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {!isVirtualCreator && (
+                          {!isCreator && (
                             <Button
                               variant="ghost"
                               size="icon"
