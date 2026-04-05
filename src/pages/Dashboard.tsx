@@ -200,6 +200,7 @@ const Dashboard = () => {
           address: editData.address,
           status: editData.status,
           cover_image_url: coverImageUrl,
+          referencia_catastral: editData.referencia_catastral,
         },
         headers: { Authorization: `Bearer ${session.session?.access_token}` },
       });
