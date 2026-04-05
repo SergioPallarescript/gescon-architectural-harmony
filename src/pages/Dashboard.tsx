@@ -79,7 +79,7 @@ const Dashboard = () => {
   // Management mode
   const [manageMode, setManageMode] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
-  const [editData, setEditData] = useState({ name: "", description: "", address: "", status: "" });
+  const [editData, setEditData] = useState({ name: "", description: "", address: "", status: "", referencia_catastral: "" });
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
