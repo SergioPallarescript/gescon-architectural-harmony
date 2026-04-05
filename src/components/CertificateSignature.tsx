@@ -133,8 +133,19 @@ export default function CertificateSignature({ disabled, userRole, onSign, origi
         timestamp,
       };
 
-      const signedBytes = await signPdfWithP12(originalPdfBytes, parsedCert, signerInfo);
-      const hash = await computeSHA256(signedBytes);
+      let signedBytes: Uint8Array;
+      let hash: string;
+      if (originalPdfBytes) {
+        signedBytes = await signPdfWithP12(originalPdfBytes, parsedCert, signerInfo);
+        hash = await computeSHA256(signedBytes);
+      } else {
+        // No PDF mode (orders/incidents) — generate hash from metadata
+        const metaStr = `${parsedCert.commonName}|${timestamp}|${geo}`;
+        const encoder = new TextEncoder();
+        const digest = await crypto.subtle.digest("SHA-256", encoder.encode(metaStr));
+        hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+        signedBytes = new Uint8Array();
+      }
 
       await onSign(signedBytes, {
         signerName: parsedCert.commonName,
