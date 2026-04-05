@@ -645,7 +645,8 @@ const OrdersModule = () => {
       {/* Fiscal data modal */}
       <FiscalDataModal
         open={showFiscalModal}
-        onClose={() => { setShowFiscalModal(false); if (pendingSubmit) { setPendingSubmit(false); handleCreate(); } }}
+        onComplete={() => { setShowFiscalModal(false); if (pendingSubmit) { setPendingSubmit(false); handleCreate(); } }}
+        onCancel={() => { setShowFiscalModal(false); setPendingSubmit(false); }}
       />
     </AppLayout>
   );
