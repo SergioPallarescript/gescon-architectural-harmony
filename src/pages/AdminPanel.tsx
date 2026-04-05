@@ -453,7 +453,7 @@ const AdminPanel = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {!isVirtualCreator && (
+                          {!isCreator && (
                             <Button
                               variant="ghost"
                               size="icon"
