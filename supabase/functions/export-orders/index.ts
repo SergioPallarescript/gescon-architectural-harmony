@@ -318,11 +318,11 @@ Deno.serve(async (req) => {
         <p style="font-size:10px;color:#6b7280;margin:0 0 16px;">Hashes SHA-256 de integridad para verificación pericial</p>
         <table class="annex-table">
           <tr>
-            <th><div class="annex-cell-inner annex-head">Nº</div></th>
-            <th><div class="annex-cell-inner annex-head">Asunto</div></th>
-            <th><div class="annex-cell-inner annex-head">Firmante</div></th>
-            <th><div class="annex-cell-inner annex-head">Hash SHA-256</div></th>
-            <th><div class="annex-cell-inner annex-head">Tipo</div></th>
+            <th class="annex-head">Nº</th>
+            <th class="annex-head">Asunto</th>
+            <th class="annex-head">Firmante</th>
+            <th class="annex-head">Hash SHA-256</th>
+            <th class="annex-head">Tipo</th>
           </tr>
           ${hashRows}
         </table>
