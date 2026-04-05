@@ -52,6 +52,59 @@ export type Database = {
           },
         ]
       }
+      book_covers: {
+        Row: {
+          book_type: string
+          colegio_oficial: string | null
+          created_at: string
+          director_ejecucion_colegiado: string | null
+          director_ejecucion_nombre: string | null
+          directores_obra: Json | null
+          fecha_comienzo: string | null
+          id: string
+          libro_numero: string | null
+          project_id: string
+          propietario_promotor: string | null
+          updated_at: string
+        }
+        Insert: {
+          book_type?: string
+          colegio_oficial?: string | null
+          created_at?: string
+          director_ejecucion_colegiado?: string | null
+          director_ejecucion_nombre?: string | null
+          directores_obra?: Json | null
+          fecha_comienzo?: string | null
+          id?: string
+          libro_numero?: string | null
+          project_id: string
+          propietario_promotor?: string | null
+          updated_at?: string
+        }
+        Update: {
+          book_type?: string
+          colegio_oficial?: string | null
+          created_at?: string
+          director_ejecucion_colegiado?: string | null
+          director_ejecucion_nombre?: string | null
+          directores_obra?: Json | null
+          fecha_comienzo?: string | null
+          id?: string
+          libro_numero?: string | null
+          project_id?: string
+          propietario_promotor?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_covers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brain_messages: {
         Row: {
           content: string
@@ -433,44 +486,71 @@ export type Database = {
       }
       incidents: {
         Row: {
+          asunto: string | null
           content: string
           created_at: string
           created_by: string
+          dirigida_a: string | null
+          escrita_por: string | null
           id: string
           incident_number: number
+          is_locked: boolean | null
           photos: string[] | null
           project_id: string
           remedial_actions: string | null
           resolved_at: string | null
           severity: string
+          signature_geo: string | null
+          signature_hash: string | null
+          signature_type: string | null
+          signed_at: string | null
+          signed_by: string | null
           status: string
           updated_at: string
         }
         Insert: {
+          asunto?: string | null
           content: string
           created_at?: string
           created_by: string
+          dirigida_a?: string | null
+          escrita_por?: string | null
           id?: string
           incident_number?: number
+          is_locked?: boolean | null
           photos?: string[] | null
           project_id: string
           remedial_actions?: string | null
           resolved_at?: string | null
           severity?: string
+          signature_geo?: string | null
+          signature_hash?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
+          asunto?: string | null
           content?: string
           created_at?: string
           created_by?: string
+          dirigida_a?: string | null
+          escrita_por?: string | null
           id?: string
           incident_number?: number
+          is_locked?: boolean | null
           photos?: string[] | null
           project_id?: string
           remedial_actions?: string | null
           resolved_at?: string | null
           severity?: string
+          signature_geo?: string | null
+          signature_hash?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
           status?: string
           updated_at?: string
         }
@@ -608,38 +688,65 @@ export type Database = {
       orders: {
         Row: {
           ai_flags: Json | null
+          asunto: string | null
           content: string
           created_at: string
           created_by: string
+          dirigida_a: string | null
+          escrita_por: string | null
           id: string
+          is_locked: boolean | null
           order_number: number
           photos: string[] | null
           project_id: string
           requires_validation: boolean | null
+          signature_geo: string | null
+          signature_hash: string | null
+          signature_type: string | null
+          signed_at: string | null
+          signed_by: string | null
           updated_at: string
         }
         Insert: {
           ai_flags?: Json | null
+          asunto?: string | null
           content: string
           created_at?: string
           created_by: string
+          dirigida_a?: string | null
+          escrita_por?: string | null
           id?: string
+          is_locked?: boolean | null
           order_number?: number
           photos?: string[] | null
           project_id: string
           requires_validation?: boolean | null
+          signature_geo?: string | null
+          signature_hash?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
           updated_at?: string
         }
         Update: {
           ai_flags?: Json | null
+          asunto?: string | null
           content?: string
           created_at?: string
           created_by?: string
+          dirigida_a?: string | null
+          escrita_por?: string | null
           id?: string
+          is_locked?: boolean | null
           order_number?: number
           photos?: string[] | null
           project_id?: string
           requires_validation?: boolean | null
+          signature_geo?: string | null
+          signature_hash?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -908,6 +1015,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          referencia_catastral: string | null
           status: string
           updated_at: string
         }
@@ -919,6 +1027,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          referencia_catastral?: string | null
           status?: string
           updated_at?: string
         }
@@ -930,6 +1039,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          referencia_catastral?: string | null
           status?: string
           updated_at?: string
         }
