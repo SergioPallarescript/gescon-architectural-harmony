@@ -23,6 +23,7 @@ import Settings from "./pages/Settings";
 import AdminPanel from "./pages/AdminPanel";
 import GlobalAdmin from "./pages/GlobalAdmin";
 import SignatureDocuments from "./pages/SignatureDocuments";
+import SubcontractingModule from "./pages/SubcontractingModule";
 import NotificationsHistory from "./pages/NotificationsHistory";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
@@ -115,6 +116,7 @@ const App = () => (
             <Route path="/project/:id/docs" element={<ProtectedRoute><ProjectDocs /></ProtectedRoute>} />
             <Route path="/project/:id/gantt" element={<ProtectedRoute><GanttModule /></ProtectedRoute>} />
             <Route path="/project/:id/signatures" element={<ProtectedRoute><SignatureDocuments /></ProtectedRoute>} />
+            <Route path="/project/:id/subcontracting" element={<ProtectedRoute><SubcontractingModule /></ProtectedRoute>} />
             <Route path="/project/:id/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><NotificationsHistory /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><GlobalAdmin /></ProtectedRoute>} />

@@ -146,31 +146,25 @@ Deno.serve(async (req) => {
       }
       .annex-table th,
       .annex-table td {
-        padding: 0;
-        border: 1px solid #ddd;
+        padding: 4px 6px;
+        border: 1px solid #bbb;
         vertical-align: middle;
-      }
-      .annex-cell-inner {
-        min-height: 42px;
-        padding: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         text-align: center;
-        line-height: 1.4;
-        box-sizing: border-box;
+        line-height: 1.2;
       }
       .annex-head {
-        background: #f9fafb;
-        font-size: 9px;
+        background: #f3f4f6;
+        font-size: 8px;
         font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
       }
       .annex-body {
-        font-size: 10px;
+        font-size: 9px;
       }
       .annex-hash {
         font-family: monospace;
-        font-size: 8px;
+        font-size: 7px;
         word-break: break-all;
       }
     `;
@@ -310,11 +304,11 @@ Deno.serve(async (req) => {
     const hashRows = (orders || []).map((order: any) => {
       const author = profileMap[order.created_by];
       return `<tr>
-        <td><div class="annex-cell-inner annex-body">${order.order_number}</div></td>
-        <td><div class="annex-cell-inner annex-body">${order.asunto || "—"}</div></td>
-        <td><div class="annex-cell-inner annex-body">${author?.full_name || "—"}</div></td>
-        <td><div class="annex-cell-inner annex-hash">${order.signature_hash || "—"}</div></td>
-        <td><div class="annex-cell-inner annex-body">${order.signature_type === "p12" ? "Cert. Digital" : "Manual"}</div></td>
+        <td class="annex-body">${order.order_number}</td>
+        <td class="annex-body">${order.asunto || "—"}</td>
+        <td class="annex-body">${author?.full_name || "—"}</td>
+        <td class="annex-hash">${order.signature_hash || "—"}</td>
+        <td class="annex-body">${order.signature_type === "p12" ? "Cert. Digital" : "Manual"}</td>
       </tr>`;
     }).join("");
 
@@ -324,11 +318,11 @@ Deno.serve(async (req) => {
         <p style="font-size:10px;color:#6b7280;margin:0 0 16px;">Hashes SHA-256 de integridad para verificación pericial</p>
         <table class="annex-table">
           <tr>
-            <th><div class="annex-cell-inner annex-head">Nº</div></th>
-            <th><div class="annex-cell-inner annex-head">Asunto</div></th>
-            <th><div class="annex-cell-inner annex-head">Firmante</div></th>
-            <th><div class="annex-cell-inner annex-head">Hash SHA-256</div></th>
-            <th><div class="annex-cell-inner annex-head">Tipo</div></th>
+            <th class="annex-head">Nº</th>
+            <th class="annex-head">Asunto</th>
+            <th class="annex-head">Firmante</th>
+            <th class="annex-head">Hash SHA-256</th>
+            <th class="annex-head">Tipo</th>
           </tr>
           ${hashRows}
         </table>
