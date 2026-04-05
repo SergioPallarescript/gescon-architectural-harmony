@@ -1149,6 +1149,165 @@ export type Database = {
           },
         ]
       }
+      subcontracting_books: {
+        Row: {
+          apertura_number: string
+          created_at: string
+          created_by: string
+          diligencia_generated_at: string | null
+          habilitacion_cause: string
+          id: string
+          is_activated: boolean
+          last_annotation_number: string | null
+          project_id: string
+          rea_number: string
+          sealed_file_name: string | null
+          sealed_file_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          apertura_number: string
+          created_at?: string
+          created_by: string
+          diligencia_generated_at?: string | null
+          habilitacion_cause?: string
+          id?: string
+          is_activated?: boolean
+          last_annotation_number?: string | null
+          project_id: string
+          rea_number: string
+          sealed_file_name?: string | null
+          sealed_file_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          apertura_number?: string
+          created_at?: string
+          created_by?: string
+          diligencia_generated_at?: string | null
+          habilitacion_cause?: string
+          id?: string
+          is_activated?: boolean
+          last_annotation_number?: string | null
+          project_id?: string
+          rea_number?: string
+          sealed_file_name?: string | null
+          sealed_file_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcontracting_books_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subcontracting_entries: {
+        Row: {
+          book_id: string
+          comitente_entry_id: string | null
+          created_at: string
+          created_by: string
+          empresa_nif: string
+          empresa_nombre: string
+          entry_number: number
+          fecha_comienzo: string
+          fecha_plan_seguridad: string | null
+          id: string
+          instrucciones_seguridad: string | null
+          is_locked: boolean | null
+          nivel_subcontratacion: number
+          objeto_contrato: string
+          project_id: string
+          responsable_dni: string
+          responsable_nombre: string
+          signature_geo: string | null
+          signature_hash: string | null
+          signature_image: string | null
+          signature_type: string | null
+          signed_at: string | null
+          signed_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          book_id: string
+          comitente_entry_id?: string | null
+          created_at?: string
+          created_by: string
+          empresa_nif: string
+          empresa_nombre: string
+          entry_number?: number
+          fecha_comienzo: string
+          fecha_plan_seguridad?: string | null
+          id?: string
+          instrucciones_seguridad?: string | null
+          is_locked?: boolean | null
+          nivel_subcontratacion?: number
+          objeto_contrato: string
+          project_id: string
+          responsable_dni: string
+          responsable_nombre: string
+          signature_geo?: string | null
+          signature_hash?: string | null
+          signature_image?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          book_id?: string
+          comitente_entry_id?: string | null
+          created_at?: string
+          created_by?: string
+          empresa_nif?: string
+          empresa_nombre?: string
+          entry_number?: number
+          fecha_comienzo?: string
+          fecha_plan_seguridad?: string | null
+          id?: string
+          instrucciones_seguridad?: string | null
+          is_locked?: boolean | null
+          nivel_subcontratacion?: number
+          objeto_contrato?: string
+          project_id?: string
+          responsable_dni?: string
+          responsable_nombre?: string
+          signature_geo?: string | null
+          signature_hash?: string | null
+          signature_image?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcontracting_entries_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "subcontracting_books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subcontracting_entries_comitente_entry_id_fkey"
+            columns: ["comitente_entry_id"]
+            isOneToOne: false
+            referencedRelation: "subcontracting_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subcontracting_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppressed_emails: {
         Row: {
           created_at: string
