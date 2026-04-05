@@ -23,6 +23,7 @@ import Settings from "./pages/Settings";
 import AdminPanel from "./pages/AdminPanel";
 import GlobalAdmin from "./pages/GlobalAdmin";
 import SignatureDocuments from "./pages/SignatureDocuments";
+import SubcontractingModule from "./pages/SubcontractingModule";
 import NotificationsHistory from "./pages/NotificationsHistory";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
