@@ -6,10 +6,19 @@ import { useProjectRole } from "@/hooks/useProjectRole";
 import AppLayout from "@/components/AppLayout";
 import AttachmentThumbnails from "@/components/AttachmentThumbnails";
 import StructuredSectionsEditor from "@/components/StructuredSectionsEditor";
+import BookCoverForm from "@/components/BookCoverForm";
+import SignatureCanvas, { type SignatureCanvasHandle } from "@/components/SignatureCanvas";
+import CertificateSignature, { type CertSignMetadata } from "@/components/CertificateSignature";
+import FiscalDataModal from "@/components/FiscalDataModal";
 import { formatOrderSections } from "@/lib/bookFormatting";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -20,7 +29,7 @@ import {
 import { toast } from "sonner";
 import { notifyProjectMembers } from "@/lib/notifications";
 import {
-  ArrowLeft, Plus, BookOpen, AlertTriangle, Mic, MicOff, Camera, Image, Paperclip, X, Pencil, Trash2, Download,
+  ArrowLeft, Plus, BookOpen, AlertTriangle, Mic, MicOff, Camera, Image, Paperclip, X, Download, Lock, ShieldCheck, FileSignature,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -30,12 +39,16 @@ const ORDER_FIELDS = [
   { key: "pendientes", label: "Pendientes", placeholder: "Tareas pendientes de resolver..." },
 ];
 
+const DESTINATARIOS = ["CONSTRUCTOR", "PROMOTOR", "DIRECCIÓN FACULTATIVA", "COORD. SEGURIDAD Y SALUD", "TODOS LOS AGENTES"];
+const EMISORES = ["DIRECCIÓN FACULTATIVA", "DIRECTOR DE OBRA", "DIRECTOR DE EJECUCIÓN", "COORD. SEGURIDAD Y SALUD"];
+
 const OrdersModule = () => {
   const { id: projectId } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { isDEM, isDO, hasDualCSS, isAdmin } = useProjectRole(projectId);
   const navigate = useNavigate();
 
+  const [project, setProject] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -43,22 +56,25 @@ const OrdersModule = () => {
   const [submitting, setSubmitting] = useState(false);
   const [recording, setRecording] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
-  const [editOrder, setEditOrder] = useState<any | null>(null);
-  const [editContent, setEditContent] = useState("");
-  const [editSubmitting, setEditSubmitting] = useState(false);
-  const [editPhotos, setEditPhotos] = useState<File[]>([]);
-  const [editRemovedPhotos, setEditRemovedPhotos] = useState<string[]>([]);
-  const [editRecording, setEditRecording] = useState(false);
-  const [editCleaning, setEditCleaning] = useState(false);
-  const [editStructuredSections, setEditStructuredSections] = useState<Record<string, string> | null>(null);
-  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
   const [cleaning, setCleaning] = useState(false);
-  const editCameraRef = useRef<HTMLInputElement>(null);
-  const editGalleryRef = useRef<HTMLInputElement>(null);
-  const editRecognitionRef = useRef<any>(null);
   const [structuredSections, setStructuredSections] = useState<Record<string, string> | null>(null);
   const [crossAlert, setCrossAlert] = useState<{ show: boolean; incidents: any[] }>({ show: false, incidents: [] });
   const recognitionRef = useRef<any>(null);
+
+  // Legal fields
+  const [dirigidaA, setDirigidaA] = useState("CONSTRUCTOR");
+  const [escritaPor, setEscritaPor] = useState("DIRECCIÓN FACULTATIVA");
+  const [asunto, setAsunto] = useState("");
+
+  // Book cover
+  const [bookCover, setBookCover] = useState<any>(null);
+  const [coverConfigured, setCoverConfigured] = useState(false);
+
+  // Signature
+  const [signatureMethod, setSignatureMethod] = useState<string>(() => localStorage.getItem("tektra_sig_method") || "manual");
+  const sigCanvasRef = useRef<SignatureCanvasHandle>(null);
+  const [showFiscalModal, setShowFiscalModal] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
 
   const canWrite = isDEM || isDO || hasDualCSS;
   const canExport = isDEM || isDO;
@@ -67,6 +83,12 @@ const OrdersModule = () => {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
+
+  const fetchProject = useCallback(async () => {
+    if (!projectId) return;
+    const { data } = await supabase.from("projects").select("*").eq("id", projectId).single();
+    if (data) setProject(data);
+  }, [projectId]);
 
   const fetchOrders = useCallback(async () => {
     if (!projectId) return;
@@ -79,168 +101,199 @@ const OrdersModule = () => {
     setLoading(false);
   }, [projectId]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { fetchProject(); fetchOrders(); }, [fetchProject, fetchOrders]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projectId || !user) return;
+  const getGeoLocation = (): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve("No disponible"); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(`${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`),
+        () => resolve("No disponible"),
+        { timeout: 5000 }
+      );
+    });
+  };
 
-    // Build final content from structured sections if available
+  const computeHash = async (text: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  const handleCreate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!projectId || !user || !profile) return;
+
+    // Check fiscal data
+    if (!profile.dni_cif || !profile.fiscal_address) {
+      setShowFiscalModal(true);
+      setPendingSubmit(true);
+      return;
+    }
+
+    // Check cover configured
+    if (!coverConfigured) {
+      toast.error("Debes configurar la portada del libro antes de crear órdenes");
+      return;
+    }
+
+    if (!asunto.trim()) {
+      toast.error("El asunto es obligatorio");
+      return;
+    }
+
     const finalContent = structuredSections
       ? formatOrderSections({ estado: structuredSections.estado || "", instrucciones: structuredSections.instrucciones || "", pendientes: structuredSections.pendientes || "" })
       : content;
 
-    // Check cross-alerts before submitting
+    if (!finalContent.trim()) {
+      toast.error("El contenido de la orden es obligatorio");
+      return;
+    }
+
+    // Check cross-alerts
     await checkCrossAlerts(finalContent);
 
+    // For manual signature, check if canvas has content
+    if (signatureMethod === "manual" && sigCanvasRef.current?.isEmpty()) {
+      toast.error("Debes firmar la orden antes de enviarla");
+      return;
+    }
+
     setSubmitting(true);
+
     const photoUrls: string[] = [];
     for (const photo of photos) {
       const path = `orders/${projectId}/${Date.now()}_${photo.name}`;
       const { error } = await supabase.storage.from("plans").upload(path, photo);
       if (!error) photoUrls.push(path);
     }
+
+    const geo = await getGeoLocation();
+    const hash = await computeHash(finalContent + new Date().toISOString() + user.id);
+
     const { error } = await supabase.from("orders").insert({
-      project_id: projectId, content: finalContent, created_by: user.id,
-      requires_validation: false, ai_flags: {},
+      project_id: projectId,
+      content: finalContent,
+      created_by: user.id,
+      requires_validation: false,
+      ai_flags: {},
       photos: photoUrls.length > 0 ? photoUrls : [],
-    });
+      dirigida_a: dirigidaA,
+      escrita_por: escritaPor,
+      asunto: asunto.trim(),
+      signature_hash: hash,
+      signature_geo: geo,
+      signature_type: signatureMethod,
+      signed_at: new Date().toISOString(),
+      signed_by: user.id,
+      is_locked: true,
+    } as any);
+
     if (error) { toast.error("Error al crear la orden"); setSubmitting(false); return; }
+
     await supabase.from("audit_logs").insert({
       user_id: user.id, project_id: projectId,
-      action: "order_created", details: { has_photos: photoUrls.length > 0 },
+      action: "order_created_legal",
+      details: { has_photos: photoUrls.length > 0, dirigida_a: dirigidaA, asunto, signature_type: signatureMethod, hash, geo },
     });
-    toast.success("Orden registrada");
+
+    toast.success("Orden registrada y firmada");
     await notifyProjectMembers({
       projectId,
       actorId: user.id,
       title: "Nueva orden registrada",
-      message: `Se ha registrado una nueva orden en el Libro de Órdenes`,
+      message: `Se ha registrado la orden: ${asunto}`,
       type: "info",
     });
-    setContent(""); setPhotos([]); setStructuredSections(null); setCreateOpen(false); setSubmitting(false); fetchOrders();
+    resetForm();
+    setCreateOpen(false);
+    setSubmitting(false);
+    fetchOrders();
   };
 
-  const handleEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editOrder || !user) return;
-    setEditSubmitting(true);
+  const handleCertSign = async (signedPdfBytes: Uint8Array, metadata: CertSignMetadata) => {
+    // For certificate signature, we create the order with certificate metadata
+    if (!projectId || !user || !profile) return;
+    if (!coverConfigured) { toast.error("Configura la portada primero"); return; }
+    if (!asunto.trim()) { toast.error("El asunto es obligatorio"); return; }
 
-    const finalContent = editStructuredSections
-      ? formatOrderSections({ estado: editStructuredSections.estado || "", instrucciones: editStructuredSections.instrucciones || "", pendientes: editStructuredSections.pendientes || "" })
-      : editContent;
+    const finalContent = structuredSections
+      ? formatOrderSections({ estado: structuredSections.estado || "", instrucciones: structuredSections.instrucciones || "", pendientes: structuredSections.pendientes || "" })
+      : content;
 
-    const newPhotoUrls: string[] = [];
-    for (const photo of editPhotos) {
+    if (!finalContent.trim()) { toast.error("El contenido es obligatorio"); return; }
+
+    setSubmitting(true);
+    const geo = await getGeoLocation();
+    const hash = await computeHash(finalContent + new Date().toISOString() + user.id);
+
+    const photoUrls: string[] = [];
+    for (const photo of photos) {
       const path = `orders/${projectId}/${Date.now()}_${photo.name}`;
       const { error } = await supabase.storage.from("plans").upload(path, photo);
-      if (!error) newPhotoUrls.push(path);
+      if (!error) photoUrls.push(path);
     }
-    if (editRemovedPhotos.length > 0) {
-      await supabase.storage.from("plans").remove(editRemovedPhotos);
-    }
-    const existingPhotos = (editOrder.photos || []).filter((p: string) => !editRemovedPhotos.includes(p));
-    const finalPhotos = [...existingPhotos, ...newPhotoUrls];
 
-    const { error } = await supabase.from("orders").update({
+    const { error } = await supabase.from("orders").insert({
+      project_id: projectId,
       content: finalContent,
+      created_by: user.id,
       requires_validation: false,
       ai_flags: {},
-      photos: finalPhotos,
-    }).eq("id", editOrder.id);
-    if (error) { toast.error("Error al editar la orden"); setEditSubmitting(false); return; }
+      photos: photoUrls.length > 0 ? photoUrls : [],
+      dirigida_a: dirigidaA,
+      escrita_por: escritaPor,
+      asunto: asunto.trim(),
+      signature_hash: hash,
+      signature_geo: geo,
+      signature_type: "p12",
+      signed_at: new Date().toISOString(),
+      signed_by: user.id,
+      is_locked: true,
+    } as any);
+
+    if (error) { toast.error("Error al crear la orden"); setSubmitting(false); return; }
+
     await supabase.from("audit_logs").insert({
-      user_id: user.id, project_id: projectId!,
-      action: "order_edited", details: { order_id: editOrder.id },
+      user_id: user.id, project_id: projectId,
+      action: "order_created_legal",
+      details: { dirigida_a: dirigidaA, asunto, signature_type: "p12", hash, geo, certificate_cn: metadata.certificateCN },
     });
+
+    toast.success("Orden registrada con certificado digital");
     await notifyProjectMembers({
-      projectId: projectId!,
-      actorId: user.id,
-      title: "Orden editada",
-      message: `La orden #${editOrder.order_number} ha sido modificada`,
+      projectId, actorId: user.id,
+      title: "Nueva orden registrada",
+      message: `Orden firmada con certificado digital: ${asunto}`,
       type: "info",
     });
-    toast.success("Orden actualizada");
-    setEditOrder(null); setEditContent(""); setEditPhotos([]); setEditRemovedPhotos([]); setEditStructuredSections(null); setEditSubmitting(false); fetchOrders();
+    resetForm();
+    setCreateOpen(false);
+    setSubmitting(false);
+    fetchOrders();
   };
 
-  const cleanEditDictation = async (rawText: string) => {
-    setEditCleaning(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("clean-dictation", {
-        body: { rawText, context: "orders", structured: true },
-      });
-      if (error) throw error;
-      if (data.structured && data.sections) {
-        setEditStructuredSections(data.sections);
-        const combined = formatOrderSections(data.sections);
-        setEditContent(combined);
-        toast.success("Dictado estructurado por IA — edita las secciones antes de guardar");
-      } else {
-        setEditContent(data.cleanedText || rawText);
-        toast.success("Dictado procesado por IA — revisa antes de guardar");
-      }
-    } catch {
-      toast.error("Error al procesar el dictado");
-    } finally {
-      setEditCleaning(false);
-    }
+  const resetForm = () => {
+    setContent("");
+    setPhotos([]);
+    setStructuredSections(null);
+    setAsunto("");
+    setDirigidaA("CONSTRUCTOR");
+    setEscritaPor("DIRECCIÓN FACULTATIVA");
   };
 
-  const toggleEditRecording = () => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      toast.error("Tu navegador no soporta reconocimiento de voz"); return;
-    }
-    if (editRecording) {
-      editRecognitionRef.current?.stop();
-      editRecognitionRef.current = null;
-      setEditRecording(false);
-      if (editContent.trim()) cleanEditDictation(editContent);
-      return;
-    }
-    const startRecognition = () => {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      editRecognitionRef.current = recognition;
-      recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
-      recognition.onresult = (event: any) => {
-        let transcript = "";
-        for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
-        setEditContent(transcript);
-      };
-      recognition.onerror = (e: any) => {
-        if (e.error === "no-speech" || e.error === "aborted") return;
-        setEditRecording(false); editRecognitionRef.current = null;
-        toast.error("Error en reconocimiento de voz");
-      };
-      recognition.onend = () => {
-        if (editRecognitionRef.current) {
-          try { recognition.start(); } catch { /* already started */ }
-        }
-      };
-      recognition.start();
-    };
-    startRecognition();
-    setEditRecording(true);
-  };
-
-  const handleDelete = async () => {
-    if (!deleteOrderId || !user) return;
-    const { error } = await supabase.from("orders").delete().eq("id", deleteOrderId);
-    if (error) { toast.error("Error al eliminar la orden"); return; }
-    await supabase.from("audit_logs").insert({
-      user_id: user.id, project_id: projectId!,
-      action: "order_deleted", details: { order_id: deleteOrderId },
+  const checkCrossAlerts = async (text: string) => {
+    if (!projectId) return;
+    const { data: openIncidents } = await supabase.from("incidents").select("*").eq("project_id", projectId).eq("status", "open");
+    if (!openIncidents || openIncidents.length === 0) return;
+    const lower = text.toLowerCase();
+    const matching = openIncidents.filter((inc: any) => {
+      const words = inc.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 4);
+      return words.some((word: string) => lower.includes(word));
     });
-    await notifyProjectMembers({
-      projectId: projectId!,
-      actorId: user.id,
-      title: "Orden eliminada",
-      message: `Se ha eliminado una orden del Libro de Órdenes`,
-      type: "warning",
-    });
-    toast.success("Orden eliminada");
-    setDeleteOrderId(null); fetchOrders();
+    if (matching.length > 0) setCrossAlert({ show: true, incidents: matching });
   };
 
   const cleanDictation = async (rawText: string) => {
@@ -254,34 +307,13 @@ const OrdersModule = () => {
         setStructuredSections(data.sections);
         const combined = formatOrderSections(data.sections);
         setContent(combined);
-        toast.success("Dictado estructurado por IA — edita las secciones antes de guardar");
+        toast.success("Dictado estructurado por IA");
       } else {
         setContent(data.cleanedText || rawText);
-        toast.success("Dictado procesado por IA — revisa el texto antes de guardar");
+        toast.success("Dictado procesado por IA");
       }
-    } catch {
-      toast.error("Error al procesar el dictado, se mantiene el texto original");
-    } finally {
-      setCleaning(false);
-    }
-  };
-
-  const checkCrossAlerts = async (text: string) => {
-    if (!projectId) return;
-    const { data: openIncidents } = await supabase
-      .from("incidents")
-      .select("*")
-      .eq("project_id", projectId)
-      .eq("status", "open");
-    if (!openIncidents || openIncidents.length === 0) return;
-    const lower = text.toLowerCase();
-    const matching = openIncidents.filter((inc: any) => {
-      const words = inc.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 4);
-      return words.some((word: string) => lower.includes(word));
-    });
-    if (matching.length > 0) {
-      setCrossAlert({ show: true, incidents: matching });
-    }
+    } catch { toast.error("Error al procesar el dictado"); }
+    finally { setCleaning(false); }
   };
 
   const toggleRecording = () => {
@@ -289,39 +321,35 @@ const OrdersModule = () => {
       toast.error("Tu navegador no soporta reconocimiento de voz"); return;
     }
     if (recording) {
-      recognitionRef.current?.stop();
-      recognitionRef.current = null;
-      setRecording(false);
-      // Send to AI after manual stop
+      recognitionRef.current?.stop(); recognitionRef.current = null; setRecording(false);
       if (content.trim()) cleanDictation(content);
       return;
     }
-    const startRecognition = () => {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
-      recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
-      recognition.onresult = (event: any) => {
-        let transcript = "";
-        for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
-        setContent(transcript);
-      };
-      recognition.onerror = (e: any) => {
-        if (e.error === "no-speech" || e.error === "aborted") return;
-        setRecording(false); recognitionRef.current = null;
-        toast.error("Error en reconocimiento de voz");
-      };
-      recognition.onend = () => {
-        // Auto-restart if still in recording mode (user hasn't pressed stop)
-        if (recognitionRef.current) {
-          try { recognition.start(); } catch { /* already started */ }
-        }
-      };
-      recognition.start();
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
+    recognition.onresult = (event: any) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
+      setContent(transcript);
     };
-    startRecognition();
+    recognition.onerror = (e: any) => {
+      if (e.error === "no-speech" || e.error === "aborted") return;
+      setRecording(false); recognitionRef.current = null;
+    };
+    recognition.onend = () => {
+      if (recognitionRef.current) { try { recognition.start(); } catch {} }
+    };
+    recognition.start();
     setRecording(true);
   };
+
+  useEffect(() => {
+    localStorage.setItem("tektra_sig_method", signatureMethod);
+  }, [signatureMethod]);
+
+  const roleLabel = profile?.role === "DO" ? "DIRECTOR DE OBRA" : profile?.role === "DEM" ? "DIRECTOR DE EJECUCIÓN" : profile?.role === "CSS" ? "COORD. SEGURIDAD Y SALUD" : "DIRECCIÓN FACULTATIVA";
 
   return (
     <AppLayout>
@@ -330,11 +358,25 @@ const OrdersModule = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(`/project/${projectId}`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">Libro de Órdenes</p>
+          <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">Libro de Órdenes y Asistencias</p>
         </div>
-        <div className="flex items-end justify-between mb-8 flex-wrap gap-2">
-          <h1 className="font-display text-3xl font-bold tracking-tighter">Órdenes</h1>
+
+        <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <h1 className="font-display text-3xl font-bold tracking-tighter">Órdenes</h1>
+            {bookCover?.libro_numero && (
+              <p className="text-xs text-muted-foreground mt-1">Libro nº {bookCover.libro_numero}</p>
+            )}
+          </div>
           <div className="flex gap-2 flex-wrap">
+            {canWrite && (
+              <BookCoverForm
+                projectId={projectId!}
+                bookType="orders"
+                project={{ name: project?.name || "", address: project?.address || null, referencia_catastral: (project as any)?.referencia_catastral }}
+                onConfigured={(c) => { setBookCover(c); setCoverConfigured(!!c.libro_numero); }}
+              />
+            )}
             {canExport && orders.length > 0 && (
               <Button
                 variant="outline"
@@ -342,108 +384,163 @@ const OrdersModule = () => {
                 onClick={async () => {
                   setExporting(true);
                   try {
-                    const { data, error } = await supabase.functions.invoke("export-orders", {
-                      body: { projectId },
-                    });
+                    const { data, error } = await supabase.functions.invoke("export-orders", { body: { projectId } });
                     if (error) throw error;
                     const blob = new Blob([data.html], { type: "text/html" });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
-                    a.href = url;
-                    a.download = data.fileName || "Libro_Ordenes.html";
-                    a.click();
+                    a.href = url; a.download = data.fileName || "Libro_Ordenes.html"; a.click();
                     URL.revokeObjectURL(url);
-                    toast.success("Libro de Órdenes exportado");
-                  } catch {
-                    toast.error("Error al exportar");
-                  } finally {
-                    setExporting(false);
-                  }
+                    toast.success("Libro exportado");
+                  } catch { toast.error("Error al exportar"); }
+                  finally { setExporting(false); }
                 }}
                 className="font-display text-xs uppercase tracking-wider gap-2"
               >
                 <Download className="h-4 w-4" />
-                {exporting ? "Exportando..." : "Exportar Libro (.docx)"}
+                {exporting ? "Exportando..." : "Exportar Libro"}
               </Button>
             )}
             {canWrite && (
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger asChild>
-                <Button data-tour="new-order" className="font-display text-xs uppercase tracking-wider gap-2"><Plus className="h-4 w-4" />Nueva Orden</Button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[90vh] overflow-y-auto">
-                <DialogHeader><DialogTitle className="font-display">Registrar Orden</DialogTitle></DialogHeader>
-                <form onSubmit={handleCreate} className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Contenido</Label>
-                      <Button type="button" variant={recording ? "destructive" : "outline"} size="sm" onClick={toggleRecording} disabled={cleaning} className="gap-1 text-xs">
-                        {cleaning ? <><span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Procesando...</> : recording ? <><MicOff className="h-3 w-3" /> Parar</> : <><Mic className="h-3 w-3" /> Dictar</>}
-                      </Button>
-                    </div>
-                    {structuredSections ? (
-                      <StructuredSectionsEditor
-                        fields={ORDER_FIELDS}
-                        title="Vista previa editable — revisa antes de guardar"
-                        values={structuredSections}
-                        onChange={(key, value) => setStructuredSections(prev => prev ? { ...prev, [key]: value } : prev)}
-                      />
-                    ) : (
-                      <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Describa la orden de obra o use el dictado por voz..." rows={6} required={!structuredSections} />
+              <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm(); }}>
+                <DialogTrigger asChild>
+                  <Button data-tour="new-order" className="font-display text-xs uppercase tracking-wider gap-2" disabled={!coverConfigured}>
+                    <Plus className="h-4 w-4" />Nueva Orden
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle className="font-display">Registrar Orden</DialogTitle>
+                    {bookCover?.libro_numero && (
+                      <p className="text-xs text-muted-foreground">Libro de órdenes y asistencias nº {bookCover.libro_numero} — Orden nº {(orders.length || 0) + 1}</p>
                     )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Adjuntar fotos / documentos</Label>
-                    <div className="flex gap-2">
-                      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files) { setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ""; } }} />
-                      <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) { setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ""; } }} />
-                      <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={(e) => { if (e.target.files) { setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ""; } }} />
-                      {isMobile ? (
-                        <>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => cameraInputRef.current?.click()}>
-                            <Camera className="h-3.5 w-3.5" /> Foto
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => galleryInputRef.current?.click()}>
-                            <Image className="h-3.5 w-3.5" /> Galería
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => fileInputRef.current?.click()}>
-                            <Paperclip className="h-3.5 w-3.5" /> Archivo
-                          </Button>
-                        </>
+                  </DialogHeader>
+                  <form onSubmit={handleCreate} className="space-y-4 mt-2">
+                    {/* Legal identification fields */}
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Dirigida a *</Label>
+                      <Select value={dirigidaA} onValueChange={setDirigidaA}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {DESTINATARIOS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Escrita por</Label>
+                      <Select value={escritaPor} onValueChange={setEscritaPor}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {EMISORES.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Asunto *</Label>
+                      <Input value={asunto} onChange={e => setAsunto(e.target.value)} placeholder="Resumen breve de la orden" required />
+                    </div>
+
+                    {/* Content with voice dictation */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Cuerpo de la Orden *</Label>
+                        <Button type="button" variant={recording ? "destructive" : "outline"} size="sm" onClick={toggleRecording} disabled={cleaning} className="gap-1 text-xs">
+                          {cleaning ? <><span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Procesando...</> : recording ? <><MicOff className="h-3 w-3" /> Parar</> : <><Mic className="h-3 w-3" /> Dictar</>}
+                        </Button>
+                      </div>
+                      {structuredSections ? (
+                        <StructuredSectionsEditor
+                          fields={ORDER_FIELDS}
+                          title="Vista previa editable"
+                          values={structuredSections}
+                          onChange={(key, value) => setStructuredSections(prev => prev ? { ...prev, [key]: value } : prev)}
+                        />
                       ) : (
-                        <>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => galleryInputRef.current?.click()}>
-                            <Camera className="h-3.5 w-3.5" /> Foto
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => fileInputRef.current?.click()}>
-                            <Paperclip className="h-3.5 w-3.5" /> Archivo
-                          </Button>
-                        </>
+                        <Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Describa la orden o use el dictado por voz..." rows={5} required={!structuredSections} />
                       )}
                     </div>
-                    {photos.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {photos.map((f, i) => (
-                          <span key={i} className="flex items-center gap-1 px-2 py-1 text-xs bg-muted rounded">
-                            {f.name.length > 20 ? f.name.slice(0, 17) + "..." : f.name}
-                            <button type="button" onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-foreground"><X className="h-3 w-3" /></button>
-                          </span>
-                        ))}
+
+                    {/* Attachments */}
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Adjuntos</Label>
+                      <div className="flex gap-2">
+                        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ""; }} />
+                        <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ""; }} />
+                        <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={e => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ""; }} />
+                        {isMobile ? (
+                          <>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => cameraInputRef.current?.click()}><Camera className="h-3.5 w-3.5" /> Foto</Button>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => galleryInputRef.current?.click()}><Image className="h-3.5 w-3.5" /> Galería</Button>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-3.5 w-3.5" /> Archivo</Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => galleryInputRef.current?.click()}><Camera className="h-3.5 w-3.5" /> Foto</Button>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-3.5 w-3.5" /> Archivo</Button>
+                          </>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <Button type="submit" disabled={submitting} className="w-full font-display text-xs uppercase tracking-wider">
-                    {submitting ? "Registrando..." : "Registrar Orden"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
+                      {photos.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {photos.map((f, i) => (
+                            <span key={i} className="flex items-center gap-1 px-2 py-1 text-xs bg-muted rounded">
+                              {f.name.length > 20 ? f.name.slice(0, 17) + "..." : f.name}
+                              <button type="button" onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-foreground"><X className="h-3 w-3" /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Signature section */}
+                    <div className="space-y-2 border-t border-border pt-4">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <FileSignature className="h-3.5 w-3.5" /> Firma Obligatoria
+                      </Label>
+                      <Tabs value={signatureMethod} onValueChange={setSignatureMethod}>
+                        <TabsList className="w-full">
+                          <TabsTrigger value="manual" className="flex-1 text-xs">Firma Manual</TabsTrigger>
+                          <TabsTrigger value="certificate" className="flex-1 text-xs">Certificado Digital</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="manual" className="mt-3">
+                          <SignatureCanvas ref={sigCanvasRef} />
+                          <Button type="submit" disabled={submitting} className="w-full mt-3 font-display text-xs uppercase tracking-wider gap-2">
+                            <ShieldCheck className="h-4 w-4" />
+                            {submitting ? "Firmando y registrando..." : "Firmar y Registrar Orden"}
+                          </Button>
+                        </TabsContent>
+                        <TabsContent value="certificate" className="mt-3">
+                          <CertificateSignature
+                            disabled={submitting}
+                            userRole={roleLabel}
+                            originalPdfBytes={null}
+                            onSign={async (_bytes, metadata) => {
+                              await handleCertSign(new Uint8Array(), metadata);
+                            }}
+                          />
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </div>
 
+        {!coverConfigured && canWrite && (
+          <div className="mb-6 p-4 border border-warning/30 bg-warning/10 rounded-lg">
+            <p className="text-sm font-display text-warning flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Configura la portada del libro antes de crear órdenes. Los datos de la portada aparecerán en todas las hojas y en el PDF exportado.
+            </p>
+          </div>
+        )}
+
         {loading ? (
-          <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-24 bg-card border border-border rounded-lg animate-pulse" />)}</div>
+          <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-24 bg-card border border-border rounded-lg animate-pulse" />)}</div>
         ) : orders.length === 0 ? (
           <div className="text-center py-20">
             <BookOpen className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
@@ -452,14 +549,35 @@ const OrdersModule = () => {
         ) : (
           <div className="space-y-3">
             {orders.map((order, i) => {
-              const isOwner = order.created_by === user?.id;
+              const isLocked = (order as any).is_locked;
               return (
-                <div key={order.id} className="bg-card border border-border rounded-lg p-5 animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
+                <div key={order.id} className="bg-card border border-border rounded-lg p-5 animate-fade-in hover:shadow-lg hover:-translate-y-0.5 transition-all" style={{ animationDelay: `${i * 60}ms` }}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
+                      {/* Legal header */}
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs font-display font-bold text-muted-foreground">#{order.order_number}</span>
+                        {isLocked && (
+                          <span className="flex items-center gap-1 text-[10px] text-success font-display uppercase tracking-wider">
+                            <Lock className="h-3 w-3" /> Firmada
+                          </span>
+                        )}
+                        {(order as any).signature_type === "p12" && (
+                          <span className="flex items-center gap-1 text-[10px] text-primary font-display uppercase tracking-wider">
+                            <ShieldCheck className="h-3 w-3" /> Certificado
+                          </span>
+                        )}
                       </div>
+
+                      {(order as any).asunto && (
+                        <p className="text-sm font-semibold mb-1">{(order as any).asunto}</p>
+                      )}
+
+                      <div className="flex gap-3 text-[10px] text-muted-foreground mb-2 flex-wrap">
+                        {(order as any).dirigida_a && <span>A: {(order as any).dirigida_a}</span>}
+                        {(order as any).escrita_por && <span>De: {(order as any).escrita_por}</span>}
+                      </div>
+
                       {order.content.includes("**ESTADO DE LA OBRA:**") ? (
                         <div className="space-y-2 mt-1">
                           {order.content.split(/\*\*(?:ESTADO DE LA OBRA|INSTRUCCIONES Y ÓRDENES|PENDIENTES):\*\*/).filter(Boolean).map((section: string, si: number) => {
@@ -476,24 +594,17 @@ const OrdersModule = () => {
                       ) : (
                         <p className="text-sm whitespace-pre-wrap">{order.content}</p>
                       )}
-                      {order.photos && order.photos.length > 0 && (
-                        <AttachmentThumbnails paths={order.photos} />
-                      )}
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {new Date(order.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-1 shrink-0">
-                      {isOwner && (
-                        <>
-                          <Button size="sm" variant="ghost" onClick={() => { setEditOrder(order); setEditContent(order.content); setEditPhotos([]); setEditRemovedPhotos([]); setEditStructuredSections(null); }} className="gap-1 text-xs text-muted-foreground">
-                            <Pencil className="h-3.5 w-3.5" /> Editar
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setDeleteOrderId(order.id)} className="gap-1 text-xs text-destructive">
-                            <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                          </Button>
-                        </>
-                      )}
+
+                      {order.photos && order.photos.length > 0 && <AttachmentThumbnails paths={order.photos} />}
+
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
+                        <span>{new Date(order.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                        {(order as any).signature_hash && (
+                          <span className="text-[9px] font-mono truncate max-w-[200px]" title={(order as any).signature_hash}>
+                            Hash: {(order as any).signature_hash.substring(0, 16)}...
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -503,92 +614,8 @@ const OrdersModule = () => {
         )}
       </div>
 
-      {/* Edit dialog — full flow with dictation, editable structured preview, and photo replacement */}
-      <Dialog open={!!editOrder} onOpenChange={(open) => { if (!open) { setEditOrder(null); setEditPhotos([]); setEditStructuredSections(null); } }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-display">Editar Orden</DialogTitle></DialogHeader>
-          <form onSubmit={handleEdit} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Contenido</Label>
-                <Button type="button" variant={editRecording ? "destructive" : "outline"} size="sm" onClick={toggleEditRecording} disabled={editCleaning} className="gap-1 text-xs">
-                  {editCleaning ? <><span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Procesando...</> : editRecording ? <><MicOff className="h-3 w-3" /> Parar</> : <><Mic className="h-3 w-3" /> Dictar</>}
-                </Button>
-              </div>
-              {editStructuredSections ? (
-                <StructuredSectionsEditor
-                  fields={ORDER_FIELDS}
-                  title="Vista previa editable — revisa antes de guardar"
-                  values={editStructuredSections}
-                  onChange={(key, value) => setEditStructuredSections(prev => prev ? { ...prev, [key]: value } : prev)}
-                />
-              ) : (
-                <Textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={6} required={!editStructuredSections} />
-              )}
-            </div>
-            {/* Current photos with remove option */}
-            {editOrder?.photos && editOrder.photos.length > 0 && (
-              <div className="space-y-2">
-                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Fotos actuales</Label>
-                <div className="flex flex-wrap gap-2">
-                  {(editOrder.photos as string[]).filter((p: string) => !editRemovedPhotos.includes(p)).map((p: string, i: number) => (
-                    <span key={i} className="flex items-center gap-1 px-2 py-1 text-xs bg-muted rounded">
-                      Foto {i + 1}
-                      <button type="button" onClick={() => setEditRemovedPhotos(prev => [...prev, p])} className="text-destructive hover:text-destructive/80"><X className="h-3 w-3" /></button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Add new photos */}
-            <div className="space-y-2">
-              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Añadir fotos / documentos</Label>
-              <div className="flex gap-2">
-                <input ref={editCameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files) setEditPhotos(prev => [...prev, ...Array.from(e.target.files!)]); if (e.target) e.target.value = ""; }} />
-                <input ref={editGalleryRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) setEditPhotos(prev => [...prev, ...Array.from(e.target.files!)]); if (e.target) e.target.value = ""; }} />
-                {isMobile ? (
-                  <>
-                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => editCameraRef.current?.click()}><Camera className="h-3.5 w-3.5" /> Foto</Button>
-                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => editGalleryRef.current?.click()}><Image className="h-3.5 w-3.5" /> Galería</Button>
-                  </>
-                ) : (
-                  <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => editGalleryRef.current?.click()}><Camera className="h-3.5 w-3.5" /> Foto</Button>
-                )}
-              </div>
-              {editPhotos.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {editPhotos.map((f, i) => (
-                    <span key={i} className="flex items-center gap-1 px-2 py-1 text-xs bg-muted rounded">
-                      {f.name.length > 20 ? f.name.slice(0, 17) + "..." : f.name}
-                      <button type="button" onClick={() => setEditPhotos(prev => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-foreground"><X className="h-3 w-3" /></button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <Button type="submit" disabled={editSubmitting} className="w-full font-display text-xs uppercase tracking-wider">
-              {editSubmitting ? "Guardando..." : "Guardar Cambios"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete confirm */}
-      <AlertDialog open={!!deleteOrderId} onOpenChange={() => setDeleteOrderId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-display">Eliminar Orden</AlertDialogTitle>
-            <AlertDialogDescription>¿Estás seguro? Esta acción no se puede deshacer. La eliminación quedará registrada en el historial.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Cross-alert: incidents related to order content */}
-      <AlertDialog open={crossAlert.show} onOpenChange={(open) => { if (!open) setCrossAlert({ show: false, incidents: [] }); }}>
+      {/* Cross-alert */}
+      <AlertDialog open={crossAlert.show} onOpenChange={open => { if (!open) setCrossAlert({ show: false, incidents: [] }); }}>
         <AlertDialogContent className="border-destructive">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display text-destructive flex items-center gap-2">
@@ -596,7 +623,7 @@ const OrdersModule = () => {
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
-                <p>Esta orden hace referencia a elementos que tienen <strong>incidencias de seguridad abiertas</strong> en el Libro de Incidencias:</p>
+                <p>Esta orden hace referencia a elementos con <strong>incidencias abiertas</strong>:</p>
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   {crossAlert.incidents.map((inc: any) => (
                     <div key={inc.id} className="p-2 bg-destructive/10 rounded text-xs border border-destructive/20">
@@ -604,16 +631,22 @@ const OrdersModule = () => {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs font-medium">¿Deseas continuar con el registro de la orden?</p>
+                <p className="text-xs font-medium">¿Deseas continuar?</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => { setCrossAlert({ show: false, incidents: [] }); setSubmitting(false); }}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => setCrossAlert({ show: false, incidents: [] })} className="bg-destructive text-destructive-foreground">Continuar de todos modos</AlertDialogAction>
+            <AlertDialogAction onClick={() => setCrossAlert({ show: false, incidents: [] })} className="bg-destructive text-destructive-foreground">Continuar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Fiscal data modal */}
+      <FiscalDataModal
+        open={showFiscalModal}
+        onClose={() => { setShowFiscalModal(false); if (pendingSubmit) { setPendingSubmit(false); handleCreate(); } }}
+      />
     </AppLayout>
   );
 };
