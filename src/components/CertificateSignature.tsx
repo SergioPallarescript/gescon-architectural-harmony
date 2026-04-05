@@ -10,7 +10,9 @@ interface CertificateSignatureProps {
   disabled?: boolean;
   userRole: string;
   onSign: (signedPdfBytes: Uint8Array, metadata: CertSignMetadata) => Promise<void>;
-  originalPdfBytes: ArrayBuffer | null;
+  originalPdfBytes?: ArrayBuffer | null;
+  /** When true, the sign button activates as soon as the certificate is loaded (no PDF needed) */
+  noPdfRequired?: boolean;
 }
 
 export interface CertSignMetadata {
