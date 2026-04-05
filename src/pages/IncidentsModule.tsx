@@ -5,25 +5,28 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjectRole } from "@/hooks/useProjectRole";
 import AppLayout from "@/components/AppLayout";
 import AttachmentThumbnails from "@/components/AttachmentThumbnails";
+import BookCoverForm from "@/components/BookCoverForm";
+import SignatureCanvas, { type SignatureCanvasHandle } from "@/components/SignatureCanvas";
+import CertificateSignature, { type CertSignMetadata } from "@/components/CertificateSignature";
+import FiscalDataModal from "@/components/FiscalDataModal";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { notifyProjectMembers } from "@/lib/notifications";
 import {
-  ArrowLeft, Plus, ShieldAlert, CheckCircle2, Mic, MicOff, Camera, Image, Paperclip, Pencil, Trash2, X,
+  ArrowLeft, Plus, ShieldAlert, Mic, MicOff, Camera, Image, Paperclip, X, Lock, ShieldCheck, FileSignature, CheckCircle2,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { AlertTriangle } from "lucide-react";
 
 const severityLabels: Record<string, { label: string; color: string }> = {
   low: { label: "Baja", color: "text-success bg-success/10" },
@@ -32,12 +35,16 @@ const severityLabels: Record<string, { label: string; color: string }> = {
   critical: { label: "Crítica", color: "text-destructive bg-destructive/20" },
 };
 
+const DESTINATARIOS = ["CONSTRUCTOR", "PROMOTOR", "DIRECCIÓN FACULTATIVA", "TODOS LOS AGENTES"];
+const EMISORES = ["COORD. SEGURIDAD Y SALUD", "DIRECCIÓN FACULTATIVA"];
+
 const IncidentsModule = () => {
   const { id: projectId } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { isCSS, hasDualCSS } = useProjectRole(projectId);
   const navigate = useNavigate();
 
+  const [project, setProject] = useState<any>(null);
   const [incidents, setIncidents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -54,38 +61,78 @@ const IncidentsModule = () => {
   const [cleaning, setCleaning] = useState(false);
   const recognitionRef = useRef<any>(null);
 
-  const [editIncident, setEditIncident] = useState<any | null>(null);
-  const [editContent, setEditContent] = useState("");
-  const [editSeverity, setEditSeverity] = useState("medium");
-  const [editRemedial, setEditRemedial] = useState("");
-  const [editSubmitting, setEditSubmitting] = useState(false);
-  const [editPhotos, setEditPhotos] = useState<File[]>([]);
-  const [editRemovedPhotos, setEditRemovedPhotos] = useState<string[]>([]);
-  const [editRecording, setEditRecording] = useState(false);
-  const [editCleaning, setEditCleaning] = useState(false);
-  const [deleteIncidentId, setDeleteIncidentId] = useState<string | null>(null);
-  const editCameraRef = useRef<HTMLInputElement>(null);
-  const editGalleryRef = useRef<HTMLInputElement>(null);
-  const editRecognitionRef = useRef<any>(null);
+  // Legal fields
+  const [dirigidaA, setDirigidaA] = useState("CONSTRUCTOR");
+  const [escritaPor, setEscritaPor] = useState("COORD. SEGURIDAD Y SALUD");
+  const [asunto, setAsunto] = useState("");
+
+  // Book cover
+  const [bookCover, setBookCover] = useState<any>(null);
+  const [coverConfigured, setCoverConfigured] = useState(false);
+
+  // Signature
+  const [signatureMethod, setSignatureMethod] = useState<string>(() => localStorage.getItem("tektra_sig_method") || "manual");
+  const sigCanvasRef = useRef<SignatureCanvasHandle>(null);
+  const [showFiscalModal, setShowFiscalModal] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
 
   const canWrite = isCSS || hasDualCSS;
 
+  const fetchProject = useCallback(async () => {
+    if (!projectId) return;
+    const { data } = await supabase.from("projects").select("*").eq("id", projectId).single();
+    if (data) setProject(data);
+  }, [projectId]);
+
   const fetchIncidents = useCallback(async () => {
     if (!projectId) return;
-    const { data } = await supabase
-      .from("incidents")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
+    const { data } = await supabase.from("incidents").select("*").eq("project_id", projectId).order("created_at", { ascending: false });
     if (data) setIncidents(data);
     setLoading(false);
   }, [projectId]);
 
-  useEffect(() => { fetchIncidents(); }, [fetchIncidents]);
+  useEffect(() => { fetchProject(); fetchIncidents(); }, [fetchProject, fetchIncidents]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projectId || !user) return;
+  const getGeoLocation = (): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve("No disponible"); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve(`${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`),
+        () => resolve("No disponible"),
+        { timeout: 5000 }
+      );
+    });
+  };
+
+  const computeHash = async (text: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  const handleCreate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!projectId || !user || !profile) return;
+
+    if (!profile.dni_cif || !profile.fiscal_address) {
+      setShowFiscalModal(true);
+      setPendingSubmit(true);
+      return;
+    }
+
+    if (!coverConfigured) {
+      toast.error("Debes configurar la portada del libro antes de crear incidencias");
+      return;
+    }
+    if (!asunto.trim()) { toast.error("El asunto es obligatorio"); return; }
+    if (!content.trim()) { toast.error("La descripción es obligatoria"); return; }
+
+    if (signatureMethod === "manual" && sigCanvasRef.current?.isEmpty()) {
+      toast.error("Debes firmar la incidencia antes de enviarla");
+      return;
+    }
+
     setSubmitting(true);
     const photoUrls: string[] = [];
     for (const photo of photos) {
@@ -93,153 +140,89 @@ const IncidentsModule = () => {
       const { error } = await supabase.storage.from("plans").upload(path, photo);
       if (!error) photoUrls.push(path);
     }
+
+    const geo = await getGeoLocation();
+    const hash = await computeHash(content + new Date().toISOString() + user.id);
+
     const { error } = await supabase.from("incidents").insert({
       project_id: projectId, content, severity,
       remedial_actions: remedial || null, photos: photoUrls, created_by: user.id,
-    });
+      dirigida_a: dirigidaA,
+      escrita_por: escritaPor,
+      asunto: asunto.trim(),
+      signature_hash: hash,
+      signature_geo: geo,
+      signature_type: signatureMethod,
+      signed_at: new Date().toISOString(),
+      signed_by: user.id,
+      is_locked: true,
+    } as any);
+
     if (error) { toast.error("Error al registrar incidencia"); setSubmitting(false); return; }
+
     await supabase.from("audit_logs").insert({
       user_id: user.id, project_id: projectId,
-      action: "incident_created", details: { severity, has_photos: photoUrls.length > 0 },
+      action: "incident_created_legal",
+      details: { severity, asunto, dirigida_a: dirigidaA, signature_type: signatureMethod, hash, geo },
     });
+
     await notifyProjectMembers({
-      projectId,
-      actorId: user.id,
+      projectId, actorId: user.id,
       title: "Nueva incidencia registrada",
-      message: `Se ha registrado una incidencia de gravedad ${severity}`,
+      message: `Incidencia de gravedad ${severity}: ${asunto}`,
       type: severity === "critical" || severity === "high" ? "warning" : "info",
     });
-    toast.success("Incidencia registrada");
-    setContent(""); setSeverity("medium"); setRemedial(""); setPhotos([]);
+
+    toast.success("Incidencia registrada y firmada");
+    resetForm();
     setCreateOpen(false); setSubmitting(false); fetchIncidents();
   };
 
-  const handleEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editIncident || !user) return;
-    setEditSubmitting(true);
+  const handleCertSign = async (_bytes: Uint8Array, metadata: CertSignMetadata) => {
+    if (!projectId || !user || !profile) return;
+    if (!coverConfigured) { toast.error("Configura la portada primero"); return; }
+    if (!asunto.trim()) { toast.error("El asunto es obligatorio"); return; }
+    if (!content.trim()) { toast.error("La descripción es obligatoria"); return; }
 
-    // Upload new photos
-    const newPhotoUrls: string[] = [];
-    for (const photo of editPhotos) {
+    setSubmitting(true);
+    const geo = await getGeoLocation();
+    const hash = await computeHash(content + new Date().toISOString() + user.id);
+
+    const photoUrls: string[] = [];
+    for (const photo of photos) {
       const path = `incidents/${projectId}/${Date.now()}_${photo.name}`;
       const { error } = await supabase.storage.from("plans").upload(path, photo);
-      if (!error) newPhotoUrls.push(path);
+      if (!error) photoUrls.push(path);
     }
-    // Remove deleted photos
-    if (editRemovedPhotos.length > 0) {
-      await supabase.storage.from("plans").remove(editRemovedPhotos);
-    }
-    const existingPhotos = (editIncident.photos || []).filter((p: string) => !editRemovedPhotos.includes(p));
-    const finalPhotos = [...existingPhotos, ...newPhotoUrls];
 
-    const { error } = await supabase.from("incidents").update({
-      content: editContent, severity: editSeverity,
-      remedial_actions: editRemedial || null,
-      photos: finalPhotos,
-    }).eq("id", editIncident.id);
-    if (error) { toast.error("Error al editar incidencia"); setEditSubmitting(false); return; }
-    await supabase.from("audit_logs").insert({
-      user_id: user.id, project_id: projectId!,
-      action: "incident_edited", details: { incident_id: editIncident.id },
-    });
-    await notifyProjectMembers({
-      projectId: projectId!,
-      actorId: user.id,
-      title: "Incidencia editada",
-      message: `La incidencia #${editIncident.incident_number} ha sido modificada`,
-      type: "info",
-    });
-    toast.success("Incidencia actualizada");
-    setEditIncident(null); setEditPhotos([]); setEditRemovedPhotos([]); setEditSubmitting(false); fetchIncidents();
+    const { error } = await supabase.from("incidents").insert({
+      project_id: projectId, content, severity,
+      remedial_actions: remedial || null, photos: photoUrls, created_by: user.id,
+      dirigida_a: dirigidaA, escrita_por: escritaPor, asunto: asunto.trim(),
+      signature_hash: hash, signature_geo: geo, signature_type: "p12",
+      signed_at: new Date().toISOString(), signed_by: user.id, is_locked: true,
+    } as any);
+
+    if (error) { toast.error("Error al registrar incidencia"); setSubmitting(false); return; }
+
+    toast.success("Incidencia registrada con certificado digital");
+    resetForm(); setCreateOpen(false); setSubmitting(false); fetchIncidents();
   };
 
-  const cleanEditDictation = async (rawText: string) => {
-    setEditCleaning(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("clean-dictation", {
-        body: { rawText, context: "incidents" },
-      });
-      if (error) throw error;
-      setEditContent(data.cleanedText || rawText);
-      toast.success("Dictado procesado por IA");
-    } catch {
-      toast.error("Error al procesar el dictado");
-    } finally {
-      setEditCleaning(false);
-    }
-  };
-
-  const toggleEditRecording = () => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      toast.error("Tu navegador no soporta reconocimiento de voz"); return;
-    }
-    if (editRecording) {
-      editRecognitionRef.current?.stop();
-      editRecognitionRef.current = null;
-      setEditRecording(false);
-      if (editContent.trim()) cleanEditDictation(editContent);
-      return;
-    }
-    const startRecognition = () => {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      editRecognitionRef.current = recognition;
-      recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
-      recognition.onresult = (event: any) => {
-        let transcript = "";
-        for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
-        setEditContent(transcript);
-      };
-      recognition.onerror = (e: any) => {
-        if (e.error === "no-speech" || e.error === "aborted") return;
-        setEditRecording(false); editRecognitionRef.current = null;
-        toast.error("Error en reconocimiento de voz");
-      };
-      recognition.onend = () => {
-        if (editRecognitionRef.current) {
-          try { recognition.start(); } catch { /* already started */ }
-        }
-      };
-      recognition.start();
-    };
-    startRecognition();
-    setEditRecording(true);
-  };
-
-  const handleDelete = async () => {
-    if (!deleteIncidentId || !user) return;
-    const { error } = await supabase.from("incidents").delete().eq("id", deleteIncidentId);
-    if (error) { toast.error("Error al eliminar incidencia"); return; }
-    await supabase.from("audit_logs").insert({
-      user_id: user.id, project_id: projectId!,
-      action: "incident_deleted", details: { incident_id: deleteIncidentId },
-    });
-    await notifyProjectMembers({
-      projectId: projectId!,
-      actorId: user.id,
-      title: "Incidencia eliminada",
-      message: `Se ha eliminado una incidencia del Libro de Incidencias`,
-      type: "warning",
-    });
-    toast.success("Incidencia eliminada");
-    setDeleteIncidentId(null); fetchIncidents();
+  const resetForm = () => {
+    setContent(""); setSeverity("medium"); setRemedial(""); setPhotos([]);
+    setAsunto(""); setDirigidaA("CONSTRUCTOR"); setEscritaPor("COORD. SEGURIDAD Y SALUD");
   };
 
   const cleanDictation = async (rawText: string) => {
     setCleaning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("clean-dictation", {
-        body: { rawText, context: "incidents" },
-      });
+      const { data, error } = await supabase.functions.invoke("clean-dictation", { body: { rawText, context: "incidents" } });
       if (error) throw error;
       setContent(data.cleanedText || rawText);
-      toast.success("Dictado procesado por IA — revisa el texto antes de guardar");
-    } catch {
-      toast.error("Error al procesar el dictado, se mantiene el texto original");
-    } finally {
-      setCleaning(false);
-    }
+      toast.success("Dictado procesado por IA");
+    } catch { toast.error("Error al procesar el dictado"); }
+    finally { setCleaning(false); }
   };
 
   const toggleRecording = () => {
@@ -247,37 +230,28 @@ const IncidentsModule = () => {
       toast.error("Tu navegador no soporta reconocimiento de voz"); return;
     }
     if (recording) {
-      recognitionRef.current?.stop();
-      recognitionRef.current = null;
-      setRecording(false);
+      recognitionRef.current?.stop(); recognitionRef.current = null; setRecording(false);
       if (content.trim()) cleanDictation(content);
       return;
     }
-    const startRecognition = () => {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
-      recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
-      recognition.onresult = (event: any) => {
-        let transcript = "";
-        for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
-        setContent(transcript);
-      };
-      recognition.onerror = (e: any) => {
-        if (e.error === "no-speech" || e.error === "aborted") return;
-        setRecording(false); recognitionRef.current = null;
-        toast.error("Error en reconocimiento de voz");
-      };
-      recognition.onend = () => {
-        if (recognitionRef.current) {
-          try { recognition.start(); } catch { /* already started */ }
-        }
-      };
-      recognition.start();
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
+    recognition.onresult = (event: any) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
+      setContent(transcript);
     };
-    startRecognition();
-    setRecording(true);
+    recognition.onerror = (e: any) => {
+      if (e.error === "no-speech" || e.error === "aborted") return;
+      setRecording(false); recognitionRef.current = null;
+    };
+    recognition.onend = () => { if (recognitionRef.current) { try { recognition.start(); } catch {} } };
+    recognition.start(); setRecording(true);
   };
+
+  const roleLabel = profile?.role === "CSS" ? "COORD. SEGURIDAD Y SALUD" : "DIRECCIÓN FACULTATIVA";
 
   return (
     <AppLayout>
@@ -288,90 +262,141 @@ const IncidentsModule = () => {
           </Button>
           <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">Libro de Incidencias</p>
         </div>
-        <div className="flex items-end justify-between mb-8">
-          <h1 className="font-display text-3xl font-bold tracking-tighter">Incidencias</h1>
-          {canWrite && (
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger asChild>
-                <Button data-tour="new-incident" className="font-display text-xs uppercase tracking-wider gap-2"><Plus className="h-4 w-4" />Nueva Incidencia</Button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[90vh] overflow-y-auto">
-                <DialogHeader><DialogTitle className="font-display">Registrar Incidencia</DialogTitle></DialogHeader>
-                <form onSubmit={handleCreate} className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Gravedad</Label>
-                    <Select value={severity} onValueChange={setSeverity}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(severityLabels).map(([k, v]) => (
-                          <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Descripción del Riesgo</Label>
-                      <Button type="button" variant={recording ? "destructive" : "outline"} size="sm" onClick={toggleRecording} disabled={cleaning} className="gap-1 text-xs">
-                        {cleaning ? <><span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Procesando...</> : recording ? <><MicOff className="h-3 w-3" /> Parar</> : <><Mic className="h-3 w-3" /> Dictar</>}
-                      </Button>
-                    </div>
-                    <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Describa la incidencia de seguridad..." rows={5} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Acciones Correctoras</Label>
-                    <Textarea value={remedial} onChange={(e) => setRemedial(e.target.value)} placeholder="Medidas correctoras propuestas..." rows={3} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                      <Camera className="h-3.5 w-3.5" /> Fotografías
-                    </Label>
-                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); if (e.target) e.target.value = ""; }} />
-                    <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); if (e.target) e.target.value = ""; }} />
-                    <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={(e) => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); if (e.target) e.target.value = ""; }} />
-                    <div className="flex gap-2">
-                      {isMobile ? (
-                        <>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => cameraInputRef.current?.click()}>
-                            <Camera className="h-3.5 w-3.5" /> Foto
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => galleryInputRef.current?.click()}>
-                            <Image className="h-3.5 w-3.5" /> Galería
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => fileInputRef.current?.click()}>
-                            <Paperclip className="h-3.5 w-3.5" /> Archivo
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => galleryInputRef.current?.click()}>
-                            <Camera className="h-3.5 w-3.5" /> Foto
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => fileInputRef.current?.click()}>
-                            <Paperclip className="h-3.5 w-3.5" /> Archivo
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                    {photos.length > 0 && (
-                      <p className="text-xs text-muted-foreground">{photos.length} archivo(s) seleccionado(s)</p>
-                    )}
-                  </div>
-                  <Button type="submit" disabled={submitting} className="w-full font-display text-xs uppercase tracking-wider">
-                    {submitting ? "Registrando..." : "Registrar Incidencia"}
+
+        <div className="flex items-end justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <h1 className="font-display text-3xl font-bold tracking-tighter">Incidencias</h1>
+            {bookCover?.libro_numero && <p className="text-xs text-muted-foreground mt-1">Libro nº {bookCover.libro_numero}</p>}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {canWrite && (
+              <BookCoverForm
+                projectId={projectId!}
+                bookType="incidents"
+                project={{ name: project?.name || "", address: project?.address || null, referencia_catastral: (project as any)?.referencia_catastral }}
+                onConfigured={c => { setBookCover(c); setCoverConfigured(!!c.libro_numero); }}
+              />
+            )}
+            {canWrite && (
+              <Dialog open={createOpen} onOpenChange={open => { setCreateOpen(open); if (!open) resetForm(); }}>
+                <DialogTrigger asChild>
+                  <Button data-tour="new-incident" className="font-display text-xs uppercase tracking-wider gap-2" disabled={!coverConfigured}>
+                    <Plus className="h-4 w-4" />Nueva Incidencia
                   </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
+                </DialogTrigger>
+                <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle className="font-display">Registrar Incidencia</DialogTitle>
+                    {bookCover?.libro_numero && (
+                      <p className="text-xs text-muted-foreground">Libro de incidencias nº {bookCover.libro_numero} — Incidencia nº {(incidents.length || 0) + 1}</p>
+                    )}
+                  </DialogHeader>
+                  <form onSubmit={handleCreate} className="space-y-4 mt-2">
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Dirigida a *</Label>
+                      <Select value={dirigidaA} onValueChange={setDirigidaA}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{DESTINATARIOS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Escrita por</Label>
+                      <Select value={escritaPor} onValueChange={setEscritaPor}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{EMISORES.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Asunto *</Label>
+                      <Input value={asunto} onChange={e => setAsunto(e.target.value)} placeholder="Resumen breve de la incidencia" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Gravedad</Label>
+                      <Select value={severity} onValueChange={setSeverity}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{Object.entries(severityLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Descripción del Riesgo *</Label>
+                        <Button type="button" variant={recording ? "destructive" : "outline"} size="sm" onClick={toggleRecording} disabled={cleaning} className="gap-1 text-xs">
+                          {cleaning ? <><span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Procesando...</> : recording ? <><MicOff className="h-3 w-3" /> Parar</> : <><Mic className="h-3 w-3" /> Dictar</>}
+                        </Button>
+                      </div>
+                      <Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Describa la incidencia de seguridad..." rows={5} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Acciones Correctoras</Label>
+                      <Textarea value={remedial} onChange={e => setRemedial(e.target.value)} placeholder="Medidas correctoras propuestas..." rows={3} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Adjuntos</Label>
+                      <div className="flex gap-2">
+                        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ""; }} />
+                        <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ""; }} />
+                        <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={e => { if (e.target.files) setPhotos(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ""; }} />
+                        {isMobile ? (
+                          <>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => cameraInputRef.current?.click()}><Camera className="h-3.5 w-3.5" /> Foto</Button>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => galleryInputRef.current?.click()}><Image className="h-3.5 w-3.5" /> Galería</Button>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-3.5 w-3.5" /> Archivo</Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => galleryInputRef.current?.click()}><Camera className="h-3.5 w-3.5" /> Foto</Button>
+                            <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-3.5 w-3.5" /> Archivo</Button>
+                          </>
+                        )}
+                      </div>
+                      {photos.length > 0 && <p className="text-xs text-muted-foreground">{photos.length} archivo(s) seleccionado(s)</p>}
+                    </div>
+
+                    {/* Signature */}
+                    <div className="space-y-2 border-t border-border pt-4">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <FileSignature className="h-3.5 w-3.5" /> Firma Obligatoria
+                      </Label>
+                      <Tabs value={signatureMethod} onValueChange={v => { setSignatureMethod(v); localStorage.setItem("tektra_sig_method", v); }}>
+                        <TabsList className="w-full">
+                          <TabsTrigger value="manual" className="flex-1 text-xs">Firma Manual</TabsTrigger>
+                          <TabsTrigger value="certificate" className="flex-1 text-xs">Certificado Digital</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="manual" className="mt-3">
+                          <SignatureCanvas ref={sigCanvasRef} />
+                          <Button type="submit" disabled={submitting} className="w-full mt-3 font-display text-xs uppercase tracking-wider gap-2">
+                            <ShieldCheck className="h-4 w-4" />
+                            {submitting ? "Firmando..." : "Firmar y Registrar"}
+                          </Button>
+                        </TabsContent>
+                        <TabsContent value="certificate" className="mt-3">
+                          <CertificateSignature
+                            disabled={submitting}
+                            userRole={roleLabel}
+                            originalPdfBytes={null}
+                            onSign={async (_bytes, metadata) => { await handleCertSign(new Uint8Array(), metadata); }}
+                          />
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
 
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-card border border-border rounded-lg animate-pulse" />
-            ))}
+        {!coverConfigured && canWrite && (
+          <div className="mb-6 p-4 border border-warning/30 bg-warning/10 rounded-lg">
+            <p className="text-sm font-display text-warning flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Configura la portada del libro antes de crear incidencias.
+            </p>
           </div>
+        )}
+
+        {loading ? (
+          <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-24 bg-card border border-border rounded-lg animate-pulse" />)}</div>
         ) : incidents.length === 0 ? (
           <div className="text-center py-20">
             <ShieldAlert className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
@@ -381,47 +406,36 @@ const IncidentsModule = () => {
           <div className="space-y-3">
             {incidents.map((inc, i) => {
               const sev = severityLabels[inc.severity] || severityLabels.medium;
-              const isOwner = inc.created_by === user?.id;
+              const isLocked = (inc as any).is_locked;
               return (
-                <div
-                  key={inc.id}
-                  className={`bg-card border border-border rounded-lg p-5 animate-fade-in ${inc.status === "resolved" ? "opacity-60" : ""}`}
-                  style={{ animationDelay: `${i * 60}ms` }}
-                >
+                <div key={inc.id} className={`bg-card border border-border rounded-lg p-5 animate-fade-in hover:shadow-lg hover:-translate-y-0.5 transition-all ${inc.status === "resolved" ? "opacity-60" : ""}`} style={{ animationDelay: `${i * 60}ms` }}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs font-display font-bold text-muted-foreground">#{inc.incident_number}</span>
                         <span className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-widest rounded ${sev.color}`}>{sev.label}</span>
-                        {inc.status === "resolved" && (
-                          <span className="flex items-center gap-1 text-xs text-success"><CheckCircle2 className="h-3 w-3" /> Resuelta</span>
-                        )}
+                        {isLocked && <span className="flex items-center gap-1 text-[10px] text-success font-display uppercase tracking-wider"><Lock className="h-3 w-3" /> Firmada</span>}
+                        {inc.status === "resolved" && <span className="flex items-center gap-1 text-xs text-success"><CheckCircle2 className="h-3 w-3" /> Resuelta</span>}
+                      </div>
+                      {(inc as any).asunto && <p className="text-sm font-semibold mb-1">{(inc as any).asunto}</p>}
+                      <div className="flex gap-3 text-[10px] text-muted-foreground mb-2 flex-wrap">
+                        {(inc as any).dirigida_a && <span>A: {(inc as any).dirigida_a}</span>}
+                        {(inc as any).escrita_por && <span>De: {(inc as any).escrita_por}</span>}
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{inc.content}</p>
-                      {inc.photos && inc.photos.length > 0 && (
-                        <AttachmentThumbnails paths={inc.photos} />
-                      )}
+                      {inc.photos && inc.photos.length > 0 && <AttachmentThumbnails paths={inc.photos} />}
                       {inc.remedial_actions && (
                         <p className="text-xs text-muted-foreground mt-2 border-l-2 border-border pl-3">
                           <strong>Correctoras:</strong> {inc.remedial_actions}
                         </p>
                       )}
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {new Date(inc.created_at).toLocaleDateString("es-ES", {
-                          day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
-                    {isOwner && (
-                      <div className="flex flex-col gap-1 shrink-0">
-                        <Button size="sm" variant="ghost" onClick={() => { setEditIncident(inc); setEditContent(inc.content); setEditSeverity(inc.severity); setEditRemedial(inc.remedial_actions || ""); setEditPhotos([]); setEditRemovedPhotos([]); }} className="gap-1 text-xs text-muted-foreground">
-                          <Pencil className="h-3.5 w-3.5" /> Editar
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setDeleteIncidentId(inc.id)} className="gap-1 text-xs text-destructive">
-                          <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                        </Button>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
+                        <span>{new Date(inc.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                        {(inc as any).signature_hash && (
+                          <span className="text-[9px] font-mono truncate max-w-[200px]">Hash: {(inc as any).signature_hash.substring(0, 16)}...</span>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               );
@@ -430,86 +444,11 @@ const IncidentsModule = () => {
         )}
       </div>
 
-      {/* Edit dialog — full flow with dictation and photo replacement */}
-      <Dialog open={!!editIncident} onOpenChange={(open) => { if (!open) { setEditIncident(null); setEditPhotos([]); setEditRemovedPhotos([]); } }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-display">Editar Incidencia</DialogTitle></DialogHeader>
-          <form onSubmit={handleEdit} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Gravedad</Label>
-              <Select value={editSeverity} onValueChange={setEditSeverity}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(severityLabels).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Descripción del Riesgo</Label>
-                <Button type="button" variant={editRecording ? "destructive" : "outline"} size="sm" onClick={toggleEditRecording} disabled={editCleaning} className="gap-1 text-xs">
-                  {editCleaning ? <><span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Procesando...</> : editRecording ? <><MicOff className="h-3 w-3" /> Parar</> : <><Mic className="h-3 w-3" /> Dictar</>}
-                </Button>
-              </div>
-              <Textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={5} required />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Acciones Correctoras</Label>
-              <Textarea value={editRemedial} onChange={(e) => setEditRemedial(e.target.value)} rows={3} />
-            </div>
-            {/* Current photos */}
-            {editIncident?.photos && editIncident.photos.length > 0 && (
-              <div className="space-y-2">
-                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Fotos actuales</Label>
-                <div className="flex flex-wrap gap-2">
-                  {(editIncident.photos as string[]).filter((p: string) => !editRemovedPhotos.includes(p)).map((p: string, i: number) => (
-                    <span key={i} className="flex items-center gap-1 px-2 py-1 text-xs bg-muted rounded">
-                      Foto {i + 1}
-                      <button type="button" onClick={() => setEditRemovedPhotos(prev => [...prev, p])} className="text-destructive hover:text-destructive/80"><X className="h-3 w-3" /></button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Add new photos */}
-            <div className="space-y-2">
-              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Añadir fotos</Label>
-              <input ref={editCameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { if (e.target.files) setEditPhotos(prev => [...prev, ...Array.from(e.target.files!)]); if (e.target) e.target.value = ""; }} />
-              <input ref={editGalleryRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) setEditPhotos(prev => [...prev, ...Array.from(e.target.files!)]); if (e.target) e.target.value = ""; }} />
-              <div className="flex gap-2">
-                {isMobile ? (
-                  <>
-                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => editCameraRef.current?.click()}><Camera className="h-3.5 w-3.5" /> Foto</Button>
-                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs flex-1" onClick={() => editGalleryRef.current?.click()}><Image className="h-3.5 w-3.5" /> Galería</Button>
-                  </>
-                ) : (
-                  <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" onClick={() => editGalleryRef.current?.click()}><Camera className="h-3.5 w-3.5" /> Foto</Button>
-                )}
-              </div>
-              {editPhotos.length > 0 && <p className="text-xs text-muted-foreground">{editPhotos.length} archivo(s) nuevo(s)</p>}
-            </div>
-            <Button type="submit" disabled={editSubmitting} className="w-full font-display text-xs uppercase tracking-wider">
-              {editSubmitting ? "Guardando..." : "Guardar Cambios"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete confirm */}
-      <AlertDialog open={!!deleteIncidentId} onOpenChange={() => setDeleteIncidentId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-display">Eliminar Incidencia</AlertDialogTitle>
-            <AlertDialogDescription>¿Estás seguro? Esta acción no se puede deshacer. La eliminación quedará registrada en el historial.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <FiscalDataModal
+        open={showFiscalModal}
+        onComplete={() => { setShowFiscalModal(false); if (pendingSubmit) { setPendingSubmit(false); handleCreate(); } }}
+        onCancel={() => { setShowFiscalModal(false); setPendingSubmit(false); }}
+      />
     </AppLayout>
   );
 };

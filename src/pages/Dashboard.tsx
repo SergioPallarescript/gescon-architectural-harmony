@@ -68,7 +68,7 @@ const Dashboard = () => {
   const { user, profile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newProject, setNewProject] = useState({ name: "", description: "", address: "" });
+  const [newProject, setNewProject] = useState({ name: "", description: "", address: "", referencia_catastral: "" });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [pendingSignatureDocs, setPendingSignatureDocs] = useState<any[]>([]);
@@ -79,7 +79,7 @@ const Dashboard = () => {
   // Management mode
   const [manageMode, setManageMode] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
-  const [editData, setEditData] = useState({ name: "", description: "", address: "", status: "" });
+  const [editData, setEditData] = useState({ name: "", description: "", address: "", status: "", referencia_catastral: "" });
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
@@ -150,8 +150,9 @@ const Dashboard = () => {
         name: newProject.name,
         description: newProject.description || null,
         address: newProject.address || null,
+        referencia_catastral: newProject.referencia_catastral || null,
         created_by: user.id,
-      })
+      } as any)
       .select()
       .single();
     if (error) { toast.error("Error al crear el proyecto"); return; }
@@ -168,7 +169,7 @@ const Dashboard = () => {
       action: "project_created", details: { name: newProject.name },
     });
     setProjects((prev) => [data, ...prev]);
-    setNewProject({ name: "", description: "", address: "" });
+    setNewProject({ name: "", description: "", address: "", referencia_catastral: "" });
     setDialogOpen(false);
     toast.success("Proyecto creado");
   };
@@ -199,6 +200,7 @@ const Dashboard = () => {
           address: editData.address,
           status: editData.status,
           cover_image_url: coverImageUrl,
+          referencia_catastral: editData.referencia_catastral,
         },
         headers: { Authorization: `Bearer ${session.session?.access_token}` },
       });
@@ -280,6 +282,13 @@ const Dashboard = () => {
                       <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Dirección</Label>
                       <Input value={newProject.address} onChange={(e) => setNewProject({ ...newProject, address: e.target.value })} placeholder="Calle Mayor 12, Madrid" />
                     </div>
+                    <div className="space-y-2">
+                      <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Referencia Catastral</Label>
+                      <Input value={newProject.referencia_catastral} onChange={(e) => setNewProject({ ...newProject, referencia_catastral: e.target.value })} placeholder="Ej: 1234567AB8901C0001DE" maxLength={20} />
+                      {newProject.referencia_catastral && newProject.referencia_catastral.length !== 20 && (
+                        <p className="text-[10px] text-muted-foreground">La referencia catastral estándar tiene 20 caracteres ({newProject.referencia_catastral.length}/20)</p>
+                      )}
+                    </div>
                     <Button type="submit" className="w-full font-display text-xs uppercase tracking-wider">Crear Proyecto</Button>
                   </form>
                 </DialogContent>
@@ -355,8 +364,9 @@ const Dashboard = () => {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground flex-wrap">
                     {project.address && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{project.address}</span>}
+                    {(project as any).referencia_catastral && <span className="text-[10px] font-mono">Ref: {(project as any).referencia_catastral}</span>}
                     <span className="flex items-center gap-1"><Users className="h-3 w-3" />Equipo</span>
                   </div>
                 </button>
@@ -364,7 +374,7 @@ const Dashboard = () => {
                   <div className="flex gap-2 mt-4 pt-3 border-t border-border relative z-10">
                     <Button variant="outline" size="sm" className="gap-1 text-xs font-display uppercase tracking-wider flex-1" onClick={() => {
                       setEditProject(project);
-                      setEditData({ name: project.name, description: project.description || "", address: project.address || "", status: project.status });
+                      setEditData({ name: project.name, description: project.description || "", address: project.address || "", status: project.status, referencia_catastral: (project as any).referencia_catastral || "" });
                     }}>
                       <Pencil className="h-3.5 w-3.5" /> Editar
                     </Button>
@@ -399,6 +409,10 @@ const Dashboard = () => {
             <div className="space-y-2">
               <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Estado</Label>
               <Input value={editData.status} onChange={(e) => setEditData(prev => ({ ...prev, status: e.target.value }))} placeholder="active, completed, cancelled" />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Referencia Catastral</Label>
+              <Input value={editData.referencia_catastral} onChange={(e) => setEditData(prev => ({ ...prev, referencia_catastral: e.target.value }))} placeholder="Ej: 1234567AB8901C0001DE" maxLength={20} />
             </div>
             <div className="space-y-2">
               <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
