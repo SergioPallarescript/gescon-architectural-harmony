@@ -386,7 +386,8 @@ const AdminPanel = () => {
                     const name = member.profiles?.full_name || email;
                     const currentRole = member.role as AppRole;
                     const secondaryRole = member.secondary_role as string | null;
-                    const isVirtualCreator = member._isCreator === true;
+                    const isVirtualCreator = member.id?.toString().startsWith("creator-");
+                    const isCreator = member._isCreator === true;
 
                     return (
                       <TableRow key={member.id}>
