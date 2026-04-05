@@ -264,7 +264,7 @@ export default function CertificateSignature({ disabled, userRole, onSign, origi
       {parsedCert && (
         <Button
           onClick={handleSign}
-          disabled={!originalPdfBytes || signing || disabled}
+          disabled={(!noPdfRequired && !originalPdfBytes) || signing || disabled}
           className="w-full gap-2 font-display text-xs uppercase tracking-wider"
         >
           {signing ? (
