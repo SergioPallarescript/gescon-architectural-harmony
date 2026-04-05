@@ -144,6 +144,11 @@ const IncidentsModule = () => {
     const geo = await getGeoLocation();
     const hash = await computeHash(content + new Date().toISOString() + user.id);
 
+    // Capture canvas signature image for manual signatures
+    const signatureImage = signatureMethod === "manual" && sigCanvasRef.current
+      ? sigCanvasRef.current.toDataUrl()
+      : null;
+
     const { error } = await supabase.from("incidents").insert({
       project_id: projectId, content, severity,
       remedial_actions: remedial || null, photos: photoUrls, created_by: user.id,
@@ -156,6 +161,7 @@ const IncidentsModule = () => {
       signed_at: new Date().toISOString(),
       signed_by: user.id,
       is_locked: true,
+      signature_image: signatureImage,
     } as any);
 
     if (error) { toast.error("Error al registrar incidencia"); setSubmitting(false); return; }
