@@ -74,6 +74,9 @@ export default function CertificateSignature({ disabled, userRole, onSign, origi
         file.arrayBuffer().then((buffer) => {
           try {
             const result = parseP12(buffer, saved);
+            if (!result.serialNumber?.trim()) {
+              throw new Error("No se ha podido extraer el DNI/NIF del certificado");
+            }
             setParsedCert(result);
             toast.success("Certificado reconocido automáticamente");
           } catch {
@@ -96,6 +99,9 @@ export default function CertificateSignature({ disabled, userRole, onSign, origi
     try {
       const buffer = await p12File.arrayBuffer();
       const result = parseP12(buffer, password);
+      if (!result.serialNumber?.trim()) {
+        throw new Error("No se ha podido extraer el DNI/NIF del certificado");
+      }
       setParsedCert(result);
       setParseError(null);
       // Save password for this certificate
@@ -112,6 +118,10 @@ export default function CertificateSignature({ disabled, userRole, onSign, origi
 
   const handleSign = useCallback(async () => {
     if (!parsedCert) return;
+    if (!parsedCert.serialNumber?.trim()) {
+      toast.error("No se ha podido extraer el DNI/NIF del certificado");
+      return;
+    }
     if (!noPdfRequired && !originalPdfBytes) return;
     setSigning(true);
     try {

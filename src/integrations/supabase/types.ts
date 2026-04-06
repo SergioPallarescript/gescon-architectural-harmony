@@ -108,6 +108,8 @@ export type Database = {
       brain_messages: {
         Row: {
           content: string
+          conversation_id: string | null
+          conversation_title: string | null
           created_at: string
           id: string
           project_id: string
@@ -116,6 +118,8 @@ export type Database = {
         }
         Insert: {
           content: string
+          conversation_id?: string | null
+          conversation_title?: string | null
           created_at?: string
           id?: string
           project_id: string
@@ -124,6 +128,8 @@ export type Database = {
         }
         Update: {
           content?: string
+          conversation_id?: string | null
+          conversation_title?: string | null
           created_at?: string
           id?: string
           project_id?: string
@@ -1152,47 +1158,77 @@ export type Database = {
       subcontracting_books: {
         Row: {
           apertura_number: string
+          contractor_name: string | null
+          contractor_nif: string | null
           created_at: string
           created_by: string
+          css_name: string | null
+          css_nif: string | null
           diligencia_generated_at: string | null
+          facultative_direction_name: string | null
+          facultative_direction_nif: string | null
           habilitacion_cause: string
           id: string
           is_activated: boolean
           last_annotation_number: string | null
           project_id: string
+          promoter_name: string | null
+          promoter_nif: string | null
           rea_number: string
           sealed_file_name: string | null
           sealed_file_path: string | null
+          site_address: string | null
+          site_locality: string | null
           updated_at: string
         }
         Insert: {
           apertura_number: string
+          contractor_name?: string | null
+          contractor_nif?: string | null
           created_at?: string
           created_by: string
+          css_name?: string | null
+          css_nif?: string | null
           diligencia_generated_at?: string | null
+          facultative_direction_name?: string | null
+          facultative_direction_nif?: string | null
           habilitacion_cause?: string
           id?: string
           is_activated?: boolean
           last_annotation_number?: string | null
           project_id: string
+          promoter_name?: string | null
+          promoter_nif?: string | null
           rea_number: string
           sealed_file_name?: string | null
           sealed_file_path?: string | null
+          site_address?: string | null
+          site_locality?: string | null
           updated_at?: string
         }
         Update: {
           apertura_number?: string
+          contractor_name?: string | null
+          contractor_nif?: string | null
           created_at?: string
           created_by?: string
+          css_name?: string | null
+          css_nif?: string | null
           diligencia_generated_at?: string | null
+          facultative_direction_name?: string | null
+          facultative_direction_nif?: string | null
           habilitacion_cause?: string
           id?: string
           is_activated?: boolean
           last_annotation_number?: string | null
           project_id?: string
+          promoter_name?: string | null
+          promoter_nif?: string | null
           rea_number?: string
           sealed_file_name?: string | null
           sealed_file_path?: string | null
+          site_address?: string | null
+          site_locality?: string | null
           updated_at?: string
         }
         Relationships: [
