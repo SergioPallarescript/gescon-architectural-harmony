@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
-  ArrowLeft, FileText, Plus, Upload, Download, Lock, ShieldCheck, FileSignature, CalendarIcon, ClipboardList, AlertTriangle, CheckCircle2,
+  ArrowLeft, FileText, Plus, Upload, Download, Lock, ShieldCheck, FileSignature, CalendarIcon, ClipboardList, AlertTriangle, CheckCircle2, Brain,
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,21 @@ const HABILITACION_CAUSES = [
   { value: "perdida", label: "Pérdida" },
   { value: "destruccion", label: "Destrucción" },
 ];
+
+const inferLocality = (address?: string | null) => {
+  if (!address) return "";
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  return parts[parts.length - 1] || address;
+};
+
+const getSuggestedMember = (members: any[], role: string) => {
+  const member = members.find((item: any) => item.role === role);
+  if (!member) return { name: "", nif: "" };
+  return {
+    name: member?.profiles?.full_name || member?.invited_email || "",
+    nif: member?.profiles?.dni_cif || "",
+  };
+};
 
 const SubcontractingModule = () => {
   const { id: projectId } = useParams<{ id: string }>();
@@ -55,6 +70,16 @@ const SubcontractingModule = () => {
   const [aperturaNumber, setAperturaNumber] = useState("");
   const [habCause, setHabCause] = useState("nueva_obra");
   const [lastAnnotation, setLastAnnotation] = useState("");
+  const [promoterName, setPromoterName] = useState("");
+  const [promoterNif, setPromoterNif] = useState("");
+  const [contractorName, setContractorName] = useState("");
+  const [contractorNif, setContractorNif] = useState("");
+  const [facultativeDirectionName, setFacultativeDirectionName] = useState("");
+  const [facultativeDirectionNif, setFacultativeDirectionNif] = useState("");
+  const [cssName, setCssName] = useState("");
+  const [cssNif, setCssNif] = useState("");
+  const [siteAddress, setSiteAddress] = useState("");
+  const [siteLocality, setSiteLocality] = useState("");
   const [submittingDiligencia, setSubmittingDiligencia] = useState(false);
 
   // Upload sealed
@@ -109,6 +134,27 @@ const SubcontractingModule = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  useEffect(() => {
+    if (!showDiligencia) return;
+    const suggestedPromoter = getSuggestedMember(members, "PRO");
+    const suggestedContractor = getSuggestedMember(members, "CON");
+    const suggestedFacultative = getSuggestedMember(members, "DO").name
+      ? getSuggestedMember(members, "DO")
+      : getSuggestedMember(members, "DEM");
+    const cssMember = members.find((item: any) => item.role === "CSS" || item.secondary_role === "CSS");
+
+    setPromoterName((value) => value || suggestedPromoter.name);
+    setPromoterNif((value) => value || suggestedPromoter.nif);
+    setContractorName((value) => value || suggestedContractor.name);
+    setContractorNif((value) => value || suggestedContractor.nif);
+    setFacultativeDirectionName((value) => value || suggestedFacultative.name);
+    setFacultativeDirectionNif((value) => value || suggestedFacultative.nif);
+    setCssName((value) => value || cssMember?.profiles?.full_name || cssMember?.invited_email || "");
+    setCssNif((value) => value || cssMember?.profiles?.dni_cif || "");
+    setSiteAddress((value) => value || project?.address || "");
+    setSiteLocality((value) => value || inferLocality(project?.address));
+  }, [showDiligencia, members, project]);
+
   const getGeoLocation = (): Promise<string> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) { resolve("No disponible"); return; }
@@ -130,8 +176,22 @@ const SubcontractingModule = () => {
   // Create diligencia
   const handleCreateDiligencia = async () => {
     if (!projectId || !user) return;
-    if (!reaNumber.trim() || !aperturaNumber.trim()) {
-      toast.error("Los campos REA y Nº Apertura son obligatorios");
+    const requiredFields = [
+      promoterName,
+      promoterNif,
+      contractorName,
+      contractorNif,
+      facultativeDirectionName,
+      facultativeDirectionNif,
+      cssName,
+      cssNif,
+      siteAddress,
+      siteLocality,
+      reaNumber,
+      aperturaNumber,
+    ];
+    if (requiredFields.some((field) => !field.trim())) {
+      toast.error("Completa todos los campos obligatorios de la primera hoja");
       return;
     }
     setSubmittingDiligencia(true);
@@ -141,6 +201,16 @@ const SubcontractingModule = () => {
       apertura_number: aperturaNumber.trim(),
       habilitacion_cause: habCause,
       last_annotation_number: lastAnnotation.trim() || null,
+      promoter_name: promoterName.trim(),
+      promoter_nif: promoterNif.trim(),
+      contractor_name: contractorName.trim(),
+      contractor_nif: contractorNif.trim(),
+      facultative_direction_name: facultativeDirectionName.trim(),
+      facultative_direction_nif: facultativeDirectionNif.trim(),
+      css_name: cssName.trim(),
+      css_nif: cssNif.trim(),
+      site_address: siteAddress.trim(),
+      site_locality: siteLocality.trim(),
       diligencia_generated_at: new Date().toISOString(),
       created_by: user.id,
     } as any);
@@ -501,34 +571,66 @@ const SubcontractingModule = () => {
             <DialogTitle className="font-display text-base">Diligencia de Habilitación</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            {/* Auto-filled data from project */}
-            {members.length > 0 && (
+             {/* Auto-filled data from project */}
+            {(members.length > 0 || project?.address) && (
               <div className="bg-muted/30 border border-border rounded-lg p-3 space-y-1.5">
                 <p className="text-[10px] font-display uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <span className="text-base">🧠</span> Datos obtenidos del proyecto
+                  <Brain className="h-3.5 w-3.5 text-primary" /> Datos sugeridos por Cerebro de Obra
                 </p>
-                {(() => {
-                  const getMember = (role: string) => {
-                    const m = members.find((m: any) => m.role === role);
-                    return m ? { name: (m as any).profiles?.full_name || m.invited_email || "—", nif: (m as any).profiles?.dni_cif || "—" } : null;
-                  };
-                  const pro = getMember("PRO");
-                  const con = getMember("CON");
-                  const df = getMember("DO") || getMember("DEM");
-                  const cssM = members.find((m: any) => m.role === "CSS" || m.secondary_role === "CSS");
-                  const css = cssM ? { name: (cssM as any).profiles?.full_name || (cssM as any).invited_email || "—", nif: (cssM as any).profiles?.dni_cif || "—" } : null;
-                  return (
-                    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
-                      {pro && <><span className="text-muted-foreground">Promotor:</span><span className="font-medium">{pro.name} — NIF: {pro.nif}</span></>}
-                      {con && <><span className="text-muted-foreground">Constructor:</span><span className="font-medium">{con.name} — NIF: {con.nif}</span></>}
-                      {df && <><span className="text-muted-foreground">Dir. Facultativa:</span><span className="font-medium">{df.name} — NIF: {df.nif}</span></>}
-                      {css && <><span className="text-muted-foreground">CSS:</span><span className="font-medium">{css.name} — NIF: {css.nif}</span></>}
-                      {project?.address && <><span className="text-muted-foreground">Domicilio obra:</span><span className="font-medium">{project.address}</span></>}
-                    </div>
-                  );
-                })()}
+                <p className="text-xs text-muted-foreground">Revisa y confirma cada dato antes de generar la diligencia. No se crearán campos vacíos.</p>
               </div>
             )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Promotor *</Label>
+                <Input value={promoterName} onChange={e => setPromoterName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">NIF Promotor *</Label>
+                <Input value={promoterNif} onChange={e => setPromoterNif(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Contratista *</Label>
+                <Input value={contractorName} onChange={e => setContractorName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">NIF Contratista *</Label>
+                <Input value={contractorNif} onChange={e => setContractorNif(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Dirección Facultativa *</Label>
+                <Input value={facultativeDirectionName} onChange={e => setFacultativeDirectionName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">NIF Dirección Facultativa *</Label>
+                <Input value={facultativeDirectionNif} onChange={e => setFacultativeDirectionNif(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Coordinador SyS *</Label>
+                <Input value={cssName} onChange={e => setCssName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">NIF Coordinador SyS *</Label>
+                <Input value={cssNif} onChange={e => setCssNif(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Domicilio de la obra *</Label>
+                <Input value={siteAddress} onChange={e => setSiteAddress(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Localidad *</Label>
+                <Input value={siteLocality} onChange={e => setSiteLocality(e.target.value)} />
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Nº Inscripción REA *</Label>
