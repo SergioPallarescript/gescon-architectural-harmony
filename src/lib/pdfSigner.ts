@@ -94,7 +94,9 @@ export function parseP12(p12Buffer: ArrayBuffer, password: string): P12ParseResu
     || mainCert.subject.getField("2.5.4.5")
     || mainCert.subject.getField("serialNumber");
   if (snAttr?.value) {
-    serialNumber = snAttr.value;
+    const rawValue = String(snAttr.value).trim();
+    const extracted = rawValue.match(/([XYZ]\d{7}[A-Z]|\d{8}[A-Z]|[A-HJNPQRSUVW]\d{7,8}[0-9A-Z])/i);
+    serialNumber = extracted?.[1]?.toUpperCase() || rawValue;
   }
   // 2. Extract from CN (common in Spanish certs: "SURNAME NAME - 12345678A")
   if (!serialNumber && commonName) {
@@ -107,7 +109,9 @@ export function parseP12(p12Buffer: ArrayBuffer, password: string): P12ParseResu
   if (!serialNumber) {
     for (const attr of mainCert.subject.attributes) {
       if (attr.type === "2.5.4.5" || attr.name === "serialName") {
-        serialNumber = String(attr.value);
+        const rawValue = String(attr.value).trim();
+        const extracted = rawValue.match(/([XYZ]\d{7}[A-Z]|\d{8}[A-Z]|[A-HJNPQRSUVW]\d{7,8}[0-9A-Z])/i);
+        serialNumber = extracted?.[1]?.toUpperCase() || rawValue;
         break;
       }
     }

@@ -29,7 +29,7 @@ serve(async (req) => {
 
     if (projectId) {
       const [{ data: project }, { data: member }] = await Promise.all([
-        supabase.from("projects").select("id, created_by").eq("id", projectId).single(),
+        supabase.from("projects").select("id, created_by, name, address, description, referencia_catastral").eq("id", projectId).single(),
         supabase.from("project_members").select("id").eq("project_id", projectId).eq("user_id", authData.user.id).eq("status", "accepted").maybeSingle(),
       ]);
 
@@ -70,8 +70,16 @@ Tu rol es:
 - Identificar documentos faltantes para el cierre de obra
 - Ofrecer un contexto completo que integre diseño original + ejecución real
 
+REGLA DE BÚSQUEDA EXHAUSTIVA:
+- Antes de responder, revisa de forma exhaustiva TODAS las fuentes suministradas en el prompt.
+- Si el usuario pide un dato técnico o administrativo concreto (por ejemplo, referencia catastral, agente, dirección, REA o fechas), intenta localizarlo primero en todas las fuentes disponibles.
+- Si tras revisar todas las fuentes el dato no aparece de forma inequívoca, NO lo ignores ni lo inventes: pide al usuario exactamente ese dato faltante.
+- Si el dato existe en el proyecto o en el historial, cítalo con su fuente.
+
 === HISTORIAL DE EJECUCIÓN ACTUALIZADO ===
 ${updatedExecutionHistory || "No hay historial de ejecución actualizado disponible todavía."}
+
+${project ? `\n=== DATOS ADMINISTRATIVOS DEL PROYECTO ===\nNombre: ${project.name || "N/D"}\nDirección: ${project.address || "N/D"}\nDescripción: ${project.description || "N/D"}\nReferencia catastral: ${project.referencia_catastral || "N/D"}` : ""}
 
 ${projectContext ? `\n${projectContext}` : 'No hay documentos ni historial de proyecto disponibles. Indica al usuario que suba documentos desde "Documentación de Proyecto" y que registre órdenes e incidencias.'}
 
