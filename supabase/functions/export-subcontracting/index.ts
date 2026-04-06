@@ -126,15 +126,15 @@ Deno.serve(async (req) => {
         <h2 style="font-size:14px;margin:0 0 4px;">REGISTRO DE SUBCONTRATACIONES</h2>
         <p style="font-size:10px;color:#666;margin:0 0 12px;">Obra: ${project.name} — ${project.address || ""}</p>
         <table style="width:100%;border-collapse:collapse;">
-          <tr style="background:#f3f4f6;">
-            <th style="padding:4px 4px;border:1px solid #999;font-size:8px;text-transform:uppercase;">Nº</th>
-            <th style="padding:4px 4px;border:1px solid #999;font-size:8px;text-transform:uppercase;">Empresa / NIF</th>
-            <th style="padding:4px 4px;border:1px solid #999;font-size:8px;text-transform:uppercase;">Nivel</th>
-            <th style="padding:4px 4px;border:1px solid #999;font-size:8px;text-transform:uppercase;">Objeto</th>
-            <th style="padding:4px 4px;border:1px solid #999;font-size:8px;text-transform:uppercase;">Inicio</th>
-            <th style="padding:4px 4px;border:1px solid #999;font-size:8px;text-transform:uppercase;">Responsable</th>
-            <th style="padding:4px 4px;border:1px solid #999;font-size:8px;text-transform:uppercase;">PSS</th>
-            <th style="padding:4px 4px;border:1px solid #999;font-size:8px;text-transform:uppercase;">Firma</th>
+          <tr>
+            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;background:#f9fafb;">Nº</th>
+            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;background:#f9fafb;text-align:left;">Empresa / NIF</th>
+            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;background:#f9fafb;">Nivel</th>
+            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;background:#f9fafb;text-align:left;">Objeto</th>
+            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;background:#f9fafb;">Inicio</th>
+            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;background:#f9fafb;text-align:left;">Responsable</th>
+            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;background:#f9fafb;">PSS</th>
+            <th style="padding:4px 8px;border:1px solid #ddd;font-size:9px;background:#f9fafb;">Firma</th>
           </tr>
           ${entryRows}
         </table>
