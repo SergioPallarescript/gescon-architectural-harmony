@@ -932,13 +932,37 @@ const CostsModule = () => {
             ) : (
               <>
                 <div className="space-y-2">
-                  <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Importe (€) *</Label>
+                  <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Importe PEM (€) *</Label>
                   <Input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="45000.00" required />
+                  <p className="text-[10px] text-muted-foreground italic">Presupuesto de Ejecución Material (sin IVA)</p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Documento PDF *</Label>
+                  <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Tipo de IVA *</Label>
+                  <Select value={ivaPercent} onValueChange={setIvaPercent}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {IVA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Live desglose */}
+                {pemAmount > 0 && (
+                  <div className="rounded-lg bg-secondary/50 p-3 space-y-1 text-sm">
+                    <p>Importe PEM: <strong>{pemAmount.toLocaleString("es-ES", { minimumFractionDigits: 2 })} €</strong></p>
+                    <p>Cuota IVA ({ivaPercent}%): <strong>{pemIVA.toLocaleString("es-ES", { minimumFractionDigits: 2 })} €</strong></p>
+                    <p className="font-display font-bold text-base">TOTAL FINAL: {pemTotal.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}</p>
+                    <p className="text-[10px] text-muted-foreground italic">Los precios indicados son Precios de Ejecución Material</p>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Documento PDF</Label>
                   <Input type="file" accept=".pdf" onChange={e => setFile(e.target.files?.[0] || null)} className="cursor-pointer" />
                 </div>
+                {(isDO || isDEM) && (docType === "presupuesto") && (
+                  <p className="text-[10px] text-success bg-success/5 border border-success/20 rounded p-2">
+                    ✓ Como miembro de la Dirección Facultativa, este documento se validará automáticamente al enviarlo.
+                  </p>
+                )}
               </>
             )}
             <AlertDialogFooter>
