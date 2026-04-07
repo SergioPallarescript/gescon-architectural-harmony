@@ -316,20 +316,22 @@ const BrainModule = () => {
                         </div>
                       </div>
                     ) : (
-                      <button onClick={() => loadConversation(conv.id)} className="w-full text-left p-2 text-xs">
-                        <p className="truncate font-medium pr-12">{conv.title}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {new Date(conv.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
-                        </p>
-                        <div className="absolute right-1 top-1.5 hidden group-hover:flex gap-0.5">
+                      <div className="flex items-start w-full">
+                        <button onClick={() => loadConversation(conv.id)} className="flex-1 text-left p-2 text-xs min-w-0">
+                          <p className="truncate font-medium">{conv.title}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {new Date(conv.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
+                          </p>
+                        </button>
+                        <div className="flex gap-0.5 shrink-0 pt-1.5 pr-1">
                           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); setEditingConvId(conv.id); setEditingTitle(conv.title); }}>
                             <Pencil className="h-3 w-3" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={e => { e.stopPropagation(); setDeleteConfirmId(conv.id); }}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={e => { e.stopPropagation(); setDeleteConfirmId(conv.id); }}>
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
-                      </button>
+                      </div>
                     )}
                   </div>
                 ))

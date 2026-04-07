@@ -13,6 +13,7 @@ import {
   ArrowLeft, CheckCircle2, Circle, Upload, FileText,
   Shield, Bell, Download, RefreshCw, Trash2, ChevronDown, ChevronUp, XCircle, Loader2,
 } from "lucide-react";
+import DocumentPreview from "@/components/DocumentPreview";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -420,11 +421,7 @@ const CFOModule = () => {
                             </div>
                             {/* Preview area */}
                             {previewUrls[item.id] ? (
-                              item.file_name?.toLowerCase().endsWith(".pdf") ? (
-                                <iframe src={previewUrls[item.id]} className="w-full h-[400px] rounded border border-border" />
-                              ) : (
-                                <img src={previewUrls[item.id]} alt={item.file_name} className="max-w-full max-h-[400px] rounded border border-border object-contain mx-auto" />
-                              )
+                              <DocumentPreview url={previewUrls[item.id]} fileName={item.file_name || ""} />
                             ) : (
                               <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" /> Cargando previsualización...
