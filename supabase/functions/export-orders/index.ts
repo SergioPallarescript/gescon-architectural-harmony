@@ -52,9 +52,10 @@ Deno.serve(async (req) => {
 
     // Fetch profiles
     const creatorIds = [...new Set((orders || []).map((o: any) => o.created_by))];
+    const recipientSignerIds = (orders || []).map((o: any) => o.recipient_signed_by).filter(Boolean);
     const memberIds = (members || []).map((m: any) => m.user_id).filter(Boolean);
     const validatorIds = (validations || []).map((v: any) => v.user_id);
-    const allIds = [...new Set([...creatorIds, ...memberIds, ...validatorIds])];
+    const allIds = [...new Set([...creatorIds, ...recipientSignerIds, ...memberIds, ...validatorIds])];
     const { data: profiles } = allIds.length > 0
       ? await supabase.from("profiles").select("user_id, full_name, role, dni_cif").in("user_id", allIds)
       : { data: [] };
@@ -248,6 +249,22 @@ Deno.serve(async (req) => {
         author?.role || "—",
         order.signature_type !== "p12" ? (order.signature_image || undefined) : undefined
       ));
+
+      // Add recipient counter-signature stamp
+      if (order.recipient_signed_by && order.recipient_signed_at) {
+        const recipientProfile = profileMap[order.recipient_signed_by];
+        const recipientDate = new Date(order.recipient_signed_at).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        stamps.push(renderStamp(
+          order.recipient_signature_type || "manual",
+          recipientProfile?.full_name || "—",
+          recipientProfile?.dni_cif || "—",
+          recipientDate,
+          order.recipient_signature_geo || "",
+          order.recipient_signature_hash || "",
+          recipientProfile?.role || "DESTINATARIO",
+          order.recipient_signature_type !== "p12" ? (order.recipient_signature_image || undefined) : undefined
+        ));
+      }
 
       // Add validation stamps
       const orderValidations = validationsByOrder[order.id] || [];
