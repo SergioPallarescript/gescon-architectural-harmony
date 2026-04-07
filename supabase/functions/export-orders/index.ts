@@ -52,9 +52,10 @@ Deno.serve(async (req) => {
 
     // Fetch profiles
     const creatorIds = [...new Set((orders || []).map((o: any) => o.created_by))];
+    const recipientSignerIds = (orders || []).map((o: any) => o.recipient_signed_by).filter(Boolean);
     const memberIds = (members || []).map((m: any) => m.user_id).filter(Boolean);
     const validatorIds = (validations || []).map((v: any) => v.user_id);
-    const allIds = [...new Set([...creatorIds, ...memberIds, ...validatorIds])];
+    const allIds = [...new Set([...creatorIds, ...recipientSignerIds, ...memberIds, ...validatorIds])];
     const { data: profiles } = allIds.length > 0
       ? await supabase.from("profiles").select("user_id, full_name, role, dni_cif").in("user_id", allIds)
       : { data: [] };
