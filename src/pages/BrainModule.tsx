@@ -277,7 +277,7 @@ const BrainModule = () => {
     <AppLayout>
       <div className="flex" style={{ height: "calc(100vh - 56px - 40px)" }}>
         {/* History sidebar */}
-        <div className={`${showHistory ? "w-72 border-r border-border" : "w-0"} transition-all overflow-hidden bg-card shrink-0`}>
+        <div className={`${showHistory ? "w-80 border-r border-border" : "w-0"} transition-all overflow-hidden bg-card shrink-0`}>
           <div className="p-3 border-b border-border flex items-center justify-between">
             <p className="text-xs font-display uppercase tracking-wider text-muted-foreground">Historial</p>
             <Button variant="ghost" size="sm" onClick={startNewConversation} className="gap-1 text-xs">
@@ -316,21 +316,19 @@ const BrainModule = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-start w-full">
-                        <button onClick={() => loadConversation(conv.id)} className="flex-1 text-left p-2 text-xs min-w-0">
+                      <div className="flex items-center w-full gap-1">
+                        <button onClick={() => loadConversation(conv.id)} className="flex-1 text-left p-2 text-xs min-w-0 overflow-hidden">
                           <p className="truncate font-medium">{conv.title}</p>
                           <p className="text-[10px] text-muted-foreground mt-0.5">
                             {new Date(conv.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
                           </p>
                         </button>
-                        <div className="flex gap-0.5 shrink-0 pt-1.5 pr-1">
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); setEditingConvId(conv.id); setEditingTitle(conv.title); }}>
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={e => { e.stopPropagation(); setDeleteConfirmId(conv.id); }}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={e => { e.stopPropagation(); setEditingConvId(conv.id); setEditingTitle(conv.title); }}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-destructive hover:text-destructive" onClick={e => { e.stopPropagation(); setDeleteConfirmId(conv.id); }}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     )}
                   </div>
