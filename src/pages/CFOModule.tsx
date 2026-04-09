@@ -340,7 +340,7 @@ const CFOModule = () => {
                     return (
                       <div key={item.id}>
                         <div
-                          className={`flex items-center justify-between p-3 rounded border transition-all cursor-pointer ${
+                          className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded border transition-all cursor-pointer gap-2 ${
                             isRejected ? "border-destructive/50 bg-destructive/5" :
                             isValidated ? "border-success/50 bg-success/10" :
                             isCompleted ? "border-success/30 bg-success/5" :
@@ -348,11 +348,11 @@ const CFOModule = () => {
                           }`}
                           onClick={() => isCompleted && item.file_url && togglePreview(item)}
                         >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            {isRejected ? <XCircle className="h-5 w-5 text-destructive shrink-0" /> :
-                             isValidated ? <CheckCircle2 className="h-5 w-5 text-success shrink-0" /> :
-                             isCompleted ? <CheckCircle2 className="h-5 w-5 text-success/60 shrink-0" /> :
-                             <Circle className="h-5 w-5 text-muted-foreground/30 shrink-0" />}
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            {isRejected ? <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" /> :
+                             isValidated ? <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" /> :
+                             isCompleted ? <CheckCircle2 className="h-5 w-5 text-success/60 shrink-0 mt-0.5" /> :
+                             <Circle className="h-5 w-5 text-muted-foreground/30 shrink-0 mt-0.5" />}
                             <div className="min-w-0">
                               <p className={`text-sm ${isRejected ? "text-destructive" : isCompleted ? "text-success" : ""}`}>
                                 <span className="font-display font-bold mr-2">{pt.num}.</span>{pt.title}
@@ -369,13 +369,13 @@ const CFOModule = () => {
                               <p className="text-[10px] text-muted-foreground/50 mt-0.5">Responsable: {pt.agentLabel}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center gap-1 shrink-0 flex-wrap pl-8 sm:pl-0" onClick={e => e.stopPropagation()}>
                             {isPending && canUpload_ && (
                               <>
                                 <label className="cursor-pointer">
                                   <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFileUpload(item.id, f); e.currentTarget.value = ""; }} />
                                   <span className={`flex items-center gap-1 px-2 py-1 text-[10px] font-display uppercase tracking-widest rounded border border-border hover:border-foreground/20 transition-colors cursor-pointer ${uploadingId === item.id ? "opacity-50" : ""}`}>
-                                    <Upload className="h-3 w-3" /> {uploadingId === item.id ? "Subiendo..." : "Subir"}
+                                    <Upload className="h-3 w-3" /> {uploadingId === item.id ? "..." : "Subir"}
                                   </span>
                                 </label>
                                 <button type="button" className="flex items-center gap-1 px-2 py-1 text-[10px] font-display uppercase tracking-widest rounded border border-border hover:border-foreground/20 transition-colors cursor-pointer" onClick={() => { setScanTargetItemId(item.id); setScannerOpen(true); }}>

@@ -1081,6 +1081,14 @@ const CostsModule = () => {
         onComplete={handleFiscalComplete}
         onCancel={() => setFiscalModalOpen(false)}
       />
+      <DocumentScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanComplete={(scannedFile) => {
+          setScannerOpen(false);
+          setFile(scannedFile);
+        }}
+      />
     </AppLayout>
   );
 };
