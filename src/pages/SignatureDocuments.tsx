@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
-import { ArrowLeft, CheckCircle2, Download, ExternalLink, FileSignature, Loader2, PenSquare, Send, Trash2, Upload, RefreshCw, Plus, X, UserPlus, ZoomIn, ZoomOut, RotateCw, Eye, FolderArchive, ScanLine } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, ExternalLink, FileSignature, Loader2, PenSquare, Send, Trash2, Upload, RefreshCw, Plus, X, UserPlus, ZoomIn, ZoomOut, RotateCw, Eye, FolderArchive } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import FiscalDataModal from "@/components/FiscalDataModal";
 import SignatureCanvas, { type SignatureCanvasHandle } from "@/components/SignatureCanvas";
@@ -22,7 +22,7 @@ import { notifyUser } from "@/lib/notifications";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import DocumentScanner from "@/components/DocumentScanner";
+
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
@@ -81,7 +81,7 @@ const SignatureDocuments = () => {
   const [deleteTarget, setDeleteTarget] = useState<SignatureDocument | null>(null);
   const [replaceTarget, setReplaceTarget] = useState<SignatureDocument | null>(null);
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
-  const [scannerOpen, setScannerOpen] = useState(false);
+  
   const [replacing, setReplacing] = useState(false);
   const [fiscalModalOpen, setFiscalModalOpen] = useState(false);
   const [fiscalData, setFiscalData] = useState<{ full_name: string; dni_cif: string } | null>(null);
@@ -638,12 +638,7 @@ const SignatureDocuments = () => {
 
               <div data-tour="sig-file" className="space-y-2">
                 <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">PDF / Documento</Label>
-                <div className="flex gap-2">
-                  <Input type="file" accept="application/pdf,.pdf,.jpg,.jpeg,.png" className="flex-1" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-                  <Button type="button" variant="outline" size="icon" className="shrink-0 h-10 w-10" onClick={() => setScannerOpen(true)} title="Escanear documento">
-                    <ScanLine className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Input type="file" accept="application/pdf,.pdf,.jpg,.jpeg,.png" className="flex-1" onChange={(e) => setFile(e.target.files?.[0] || null)} />
                 {file && <p className="text-[10px] text-muted-foreground truncate">{file.name}</p>}
               </div>
               <Button type="submit" className="w-full gap-2 font-display text-xs uppercase tracking-wider" disabled={creating}>
@@ -946,14 +941,6 @@ const SignatureDocuments = () => {
         onCancel={() => setFiscalModalOpen(false)}
       />
 
-      <DocumentScanner
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onScanComplete={(scannedFile) => {
-          setFile(scannedFile);
-          setScannerOpen(false);
-        }}
-      />
     </AppLayout>
   );
 };
