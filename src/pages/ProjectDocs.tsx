@@ -6,7 +6,7 @@ import { useProjectRole } from "@/hooks/useProjectRole";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, FileText, Trash2, FolderOpen, Loader2, Download, RefreshCw, ChevronDown, ChevronUp, ScanLine } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Trash2, FolderOpen, Loader2, Download, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import DocumentPreview from "@/components/DocumentPreview";
 import DocumentScanner from "@/components/DocumentScanner";
 import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
