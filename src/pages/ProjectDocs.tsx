@@ -6,9 +6,9 @@ import { useProjectRole } from "@/hooks/useProjectRole";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, FileText, Trash2, FolderOpen, Loader2, Download, RefreshCw, ChevronDown, ChevronUp, ScanLine } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Trash2, FolderOpen, Loader2, Download, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import DocumentPreview from "@/components/DocumentPreview";
-import DocumentScanner from "@/components/DocumentScanner";
+
 import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 
 const ProjectDocs = () => {
@@ -21,7 +21,7 @@ const ProjectDocs = () => {
   const [uploading, setUploading] = useState(false);
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
-  const [scannerOpen, setScannerOpen] = useState(false);
+  
 
   const fetchDocs = useCallback(async () => {
     if (!projectId) return;
@@ -142,9 +142,6 @@ const ProjectDocs = () => {
           </div>
           {canUpload && (
             <div className="flex gap-2 shrink-0">
-              <Button variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" onClick={() => setScannerOpen(true)}>
-                <ScanLine className="h-4 w-4" /> Escanear
-              </Button>
               <label data-tour="upload-docs" className="cursor-pointer">
                 <input
                   type="file" multiple className="hidden"
@@ -246,14 +243,6 @@ const ProjectDocs = () => {
         )}
       </div>
 
-      <DocumentScanner
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onScanComplete={(scannedFile) => {
-          setScannerOpen(false);
-          void handleUpload([scannedFile] as unknown as FileList);
-        }}
-      />
     </AppLayout>
   );
 };

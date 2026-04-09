@@ -26,8 +26,9 @@ import { toast } from "sonner";
 import { notifyProjectMembers } from "@/lib/notifications";
 import {
   ArrowLeft, Plus, DollarSign, CheckCircle2, XCircle, Download, ExternalLink,
-  Pencil, Trash2, Loader2, FileSignature, Upload, FileText, ZoomIn, ZoomOut, RotateCw,
+  Pencil, Trash2, Loader2, FileSignature, Upload, FileText, ZoomIn, ZoomOut, RotateCw, ScanLine,
 } from "lucide-react";
+import DocumentScanner from "@/components/DocumentScanner";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
@@ -118,6 +119,7 @@ const CostsModule = () => {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [deleteClaim, setDeleteClaim] = useState<string | null>(null);
   const [fiscalModalOpen, setFiscalModalOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [signMethod, setSignMethod] = useState<string>(() => {
     const saved = localStorage.getItem("tektra_sign_method");
     return saved === "autofirma" ? "certificate" : (saved || "certificate");
@@ -985,7 +987,12 @@ const CostsModule = () => {
                 )}
                 <div className="space-y-2">
                   <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Documento PDF</Label>
-                  <Input type="file" accept=".pdf" onChange={e => setFile(e.target.files?.[0] || null)} className="cursor-pointer" />
+                  <div className="flex gap-2 items-center">
+                    <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setFile(e.target.files?.[0] || null)} className="cursor-pointer flex-1" />
+                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs shrink-0" onClick={() => setScannerOpen(true)}>
+                      <ScanLine className="h-3.5 w-3.5" /> Scan
+                    </Button>
+                  </div>
                 </div>
                 {(isDO || isDEM) && (docType === "presupuesto") && (
                   <p className="text-[10px] text-success bg-success/5 border border-success/20 rounded p-2">
@@ -1073,6 +1080,14 @@ const CostsModule = () => {
         open={fiscalModalOpen}
         onComplete={handleFiscalComplete}
         onCancel={() => setFiscalModalOpen(false)}
+      />
+      <DocumentScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanComplete={(scannedFile) => {
+          setScannerOpen(false);
+          setFile(scannedFile);
+        }}
       />
     </AppLayout>
   );
