@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
-import { ArrowLeft, CheckCircle2, Download, ExternalLink, FileSignature, Loader2, PenSquare, Send, Trash2, Upload, RefreshCw, Plus, X, UserPlus, ZoomIn, ZoomOut, RotateCw, Eye, FolderArchive } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, ExternalLink, FileSignature, Loader2, PenSquare, Send, Trash2, Upload, RefreshCw, Plus, X, UserPlus, ZoomIn, ZoomOut, RotateCw, Eye, FolderArchive, ScanLine } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import FiscalDataModal from "@/components/FiscalDataModal";
 import SignatureCanvas, { type SignatureCanvasHandle } from "@/components/SignatureCanvas";
@@ -22,6 +22,7 @@ import { notifyUser } from "@/lib/notifications";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import DocumentScanner from "@/components/DocumentScanner";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
@@ -80,6 +81,7 @@ const SignatureDocuments = () => {
   const [deleteTarget, setDeleteTarget] = useState<SignatureDocument | null>(null);
   const [replaceTarget, setReplaceTarget] = useState<SignatureDocument | null>(null);
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const [fiscalModalOpen, setFiscalModalOpen] = useState(false);
   const [fiscalData, setFiscalData] = useState<{ full_name: string; dni_cif: string } | null>(null);
@@ -336,25 +338,32 @@ const SignatureDocuments = () => {
     if (!deleteTarget || !user) return;
     try {
       // 1. Delete all recipient rows first (FK constraint)
-      await (supabase.from("signature_document_recipients" as any) as any)
+      const { error: recErr } = await (supabase.from("signature_document_recipients" as any) as any)
         .delete()
         .eq("document_id", deleteTarget.id);
+      if (recErr) console.warn("Error deleting recipients:", recErr);
       // 2. Remove file from storage
       await supabase.storage.from("plans").remove([deleteTarget.original_file_path]);
       if (deleteTarget.signed_file_path) {
         await supabase.storage.from("plans").remove([deleteTarget.signed_file_path]);
       }
       // 3. Delete the document record
-      await (supabase.from("signature_documents" as any) as any).delete().eq("id", deleteTarget.id);
+      const { error: docErr } = await (supabase.from("signature_documents" as any) as any)
+        .delete()
+        .eq("id", deleteTarget.id)
+        .eq("sender_id", user.id);
+      if (docErr) throw docErr;
       await supabase.from("audit_logs").insert({
         user_id: user.id, project_id: projectId,
         action: "signature_document_deleted", details: { document_id: deleteTarget.id, title: deleteTarget.title },
       });
-      toast.success("Documento eliminado");
+      toast.success("Documento eliminado completamente");
       if (selectedDocument?.id === deleteTarget.id) setSelectedDocument(null);
+      // Remove from local state immediately
+      setDocuments(prev => prev.filter(d => d.id !== deleteTarget.id));
+      setDocRecipients(prev => prev.filter(r => r.document_id !== deleteTarget.id));
       setDeleteTarget(null);
-      await fetchDocuments();
-    } catch { toast.error("Error al eliminar"); }
+    } catch (err: any) { toast.error(err?.message || "Error al eliminar"); }
   };
 
   const handleReplace = async () => {
@@ -628,8 +637,14 @@ const SignatureDocuments = () => {
               </div>
 
               <div data-tour="sig-file" className="space-y-2">
-                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">PDF</Label>
-                <Input type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} required />
+                <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">PDF / Documento</Label>
+                <div className="flex gap-2">
+                  <Input type="file" accept="application/pdf,.pdf,.jpg,.jpeg,.png" className="flex-1" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                  <Button type="button" variant="outline" size="icon" className="shrink-0 h-10 w-10" onClick={() => setScannerOpen(true)} title="Escanear documento">
+                    <ScanLine className="h-4 w-4" />
+                  </Button>
+                </div>
+                {file && <p className="text-[10px] text-muted-foreground truncate">{file.name}</p>}
               </div>
               <Button type="submit" className="w-full gap-2 font-display text-xs uppercase tracking-wider" disabled={creating}>
                 {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : isInfoOnly ? <FolderArchive className="h-4 w-4" /> : <Send className="h-4 w-4" />}
@@ -638,15 +653,15 @@ const SignatureDocuments = () => {
             </form>
 
             <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-              <div className="flex gap-1">
-                <Button variant={activeTab === "pending" ? "default" : "outline"} className="flex-1 text-[9px] sm:text-xs font-display uppercase tracking-wider px-2" onClick={() => setActiveTab("pending")}>
-                  Pendientes ({pendingDocuments.length})
+              <div className="flex gap-1 w-full overflow-hidden">
+                <Button variant={activeTab === "pending" ? "default" : "outline"} className="flex-1 min-w-0 text-[9px] sm:text-xs font-display uppercase tracking-wider px-1.5 truncate" onClick={() => setActiveTab("pending")}>
+                  Pend. ({pendingDocuments.length})
                 </Button>
-                <Button variant={activeTab === "sent" ? "default" : "outline"} className="flex-1 text-[9px] sm:text-xs font-display uppercase tracking-wider px-2" onClick={() => setActiveTab("sent")}>
+                <Button variant={activeTab === "sent" ? "default" : "outline"} className="flex-1 min-w-0 text-[9px] sm:text-xs font-display uppercase tracking-wider px-1.5 truncate" onClick={() => setActiveTab("sent")}>
                   Firmados
                 </Button>
-                <Button variant={activeTab === "archive" ? "default" : "outline"} className="flex-1 text-[9px] sm:text-xs font-display uppercase tracking-wider px-2 gap-1" onClick={() => setActiveTab("archive")}>
-                  <FolderArchive className="h-3 w-3" /> Archivo ({archiveDocuments.length})
+                <Button variant={activeTab === "archive" ? "default" : "outline"} className="flex-1 min-w-0 text-[9px] sm:text-xs font-display uppercase tracking-wider px-1.5 gap-1 truncate" onClick={() => setActiveTab("archive")}>
+                  <FolderArchive className="h-3 w-3 shrink-0" /> <span className="truncate">Archivo ({archiveDocuments.length})</span>
                 </Button>
               </div>
 
@@ -929,6 +944,15 @@ const SignatureDocuments = () => {
         open={fiscalModalOpen}
         onComplete={handleFiscalComplete}
         onCancel={() => setFiscalModalOpen(false)}
+      />
+
+      <DocumentScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanComplete={(scannedFile) => {
+          setFile(scannedFile);
+          setScannerOpen(false);
+        }}
       />
     </AppLayout>
   );

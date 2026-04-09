@@ -11,9 +11,10 @@ import { notifyUser } from "@/lib/notifications";
 import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import {
   ArrowLeft, CheckCircle2, Circle, Upload, FileText,
-  Shield, Bell, Download, RefreshCw, Trash2, ChevronDown, ChevronUp, XCircle, Loader2,
+  Shield, Bell, Download, RefreshCw, Trash2, ChevronDown, ChevronUp, XCircle, Loader2, ScanLine,
 } from "lucide-react";
 import DocumentPreview from "@/components/DocumentPreview";
+import DocumentScanner from "@/components/DocumentScanner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -61,6 +62,8 @@ const CFOModule = () => {
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; item: any | null }>({ open: false, item: null });
   const [rejectReason, setRejectReason] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanTargetItemId, setScanTargetItemId] = useState<string | null>(null);
 
   const { isDEM, projectRole } = useProjectRole(projectId);
   const userRole = projectRole as AppRole | undefined;
@@ -368,12 +371,17 @@ const CFOModule = () => {
                           </div>
                           <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                             {isPending && canUpload_ && (
-                              <label className="cursor-pointer">
-                                <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFileUpload(item.id, f); e.currentTarget.value = ""; }} />
-                                <span className={`flex items-center gap-1 px-2 py-1 text-[10px] font-display uppercase tracking-widest rounded border border-border hover:border-foreground/20 transition-colors cursor-pointer ${uploadingId === item.id ? "opacity-50" : ""}`}>
-                                  <Upload className="h-3 w-3" /> {uploadingId === item.id ? "Subiendo..." : "Subir"}
-                                </span>
-                              </label>
+                              <>
+                                <label className="cursor-pointer">
+                                  <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFileUpload(item.id, f); e.currentTarget.value = ""; }} />
+                                  <span className={`flex items-center gap-1 px-2 py-1 text-[10px] font-display uppercase tracking-widest rounded border border-border hover:border-foreground/20 transition-colors cursor-pointer ${uploadingId === item.id ? "opacity-50" : ""}`}>
+                                    <Upload className="h-3 w-3" /> {uploadingId === item.id ? "Subiendo..." : "Subir"}
+                                  </span>
+                                </label>
+                                <button type="button" className="flex items-center gap-1 px-2 py-1 text-[10px] font-display uppercase tracking-widest rounded border border-border hover:border-foreground/20 transition-colors cursor-pointer" onClick={() => { setScanTargetItemId(item.id); setScannerOpen(true); }}>
+                                  <ScanLine className="h-3 w-3" /> Scan
+                                </button>
+                              </>
                             )}
                             {isDEM && isCompleted && !isValidated && (
                               <>
@@ -491,6 +499,18 @@ const CFOModule = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DocumentScanner
+        open={scannerOpen}
+        onClose={() => { setScannerOpen(false); setScanTargetItemId(null); }}
+        onScanComplete={(scannedFile) => {
+          setScannerOpen(false);
+          if (scanTargetItemId) {
+            void handleFileUpload(scanTargetItemId, scannedFile);
+          }
+          setScanTargetItemId(null);
+        }}
+      />
     </AppLayout>
   );
 };
