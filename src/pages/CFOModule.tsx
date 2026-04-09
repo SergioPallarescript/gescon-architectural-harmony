@@ -499,6 +499,18 @@ const CFOModule = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DocumentScanner
+        open={scannerOpen}
+        onClose={() => { setScannerOpen(false); setScanTargetItemId(null); }}
+        onScanComplete={(scannedFile) => {
+          setScannerOpen(false);
+          if (scanTargetItemId) {
+            void handleFileUpload(scanTargetItemId, scannedFile);
+          }
+          setScanTargetItemId(null);
+        }}
+      />
     </AppLayout>
   );
 };
