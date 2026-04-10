@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ArrowLeft, Brain, Send, Bot, User, Loader2, FileText, Mic, MicOff, History, Plus, MessageSquare, Pencil, Trash2, Check, X } from "lucide-react";
+import { ArrowLeft, Brain, Send, Bot, User, Loader2, FileText, Mic, MicOff, History, Plus, MessageSquare, Pencil, Trash2, Check, X, Camera, Image as ImageIcon, Paperclip } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import ReactMarkdown from "react-markdown";
 import { syncProjectMemory } from "@/lib/projectMemory";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; imageUrl?: string };
 type Conversation = { id: string; title: string; created_at: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/brain-chat`;
@@ -33,6 +34,13 @@ const BrainModule = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [voiceRecording, setVoiceRecording] = useState(false);
   const voiceRecognitionRef = useRef<any>(null);
+  const isMobile = useIsMobile();
+
+  // Image upload for vision
+  const [chatImage, setChatImage] = useState<File | null>(null);
+  const [chatImagePreview, setChatImagePreview] = useState<string | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Conversation history
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -175,16 +183,62 @@ const BrainModule = () => {
     });
   };
 
+  const compressImage = async (file: File, maxWidth = 1200, quality = 0.7): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const scale = Math.min(1, maxWidth / img.width);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageSelect = async (file: File) => {
+    setChatImage(file);
+    const preview = URL.createObjectURL(file);
+    setChatImagePreview(preview);
+  };
+
+  const clearChatImage = () => {
+    if (chatImagePreview) URL.revokeObjectURL(chatImagePreview);
+    setChatImage(null);
+    setChatImagePreview(null);
+  };
+
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-    const userMsg: Msg = { role: "user", content: input.trim() };
+    if ((!input.trim() && !chatImage) || isLoading) return;
+    
+    let imageDataUrl: string | undefined;
+    if (chatImage) {
+      try {
+        imageDataUrl = await compressImage(chatImage);
+      } catch {
+        toast.error("Error al procesar la imagen");
+        return;
+      }
+    }
+
+    const userMsg: Msg = { role: "user", content: input.trim() || (chatImage ? "Analiza esta imagen" : ""), imageUrl: imageDataUrl };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    clearChatImage();
     setIsLoading(true);
 
     const isFirstMessage = messages.length === 0;
     const convTitle = isFirstMessage ? userMsg.content.substring(0, 80) : undefined;
-    await saveMessage("user", userMsg.content, convTitle);
+    await saveMessage("user", userMsg.content + (imageDataUrl ? " [📷 Imagen adjunta]" : ""), convTitle);
 
     let assistantSoFar = "";
     const upsertAssistant = (chunk: string) => {
@@ -217,10 +271,24 @@ const BrainModule = () => {
           ].join("\n")
         : undefined;
 
+      // Build messages for API – convert imageUrl to multimodal format
+      const apiMessages = [...messages, userMsg].map(m => {
+        if (m.imageUrl) {
+          return {
+            role: m.role,
+            content: [
+              { type: "text" as const, text: m.content || "Analiza esta imagen en el contexto de la obra" },
+              { type: "image_url" as const, image_url: { url: m.imageUrl } },
+            ],
+          };
+        }
+        return { role: m.role, content: m.content };
+      });
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` },
-        body: JSON.stringify({ messages: [...messages, userMsg], projectContext, projectId, dynamicContext: freshDynamicMemory }),
+        body: JSON.stringify({ messages: apiMessages, projectContext, projectId, dynamicContext: freshDynamicMemory, hasImages: !!imageDataUrl }),
       });
 
       if (!resp.ok) { const err = await resp.json().catch(() => ({})); throw new Error(err.error || "Error del servidor"); }
@@ -385,6 +453,9 @@ const BrainModule = () => {
                   <div className="shrink-0 w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center mt-1"><Bot className="h-4 w-4 text-accent" /></div>
                 )}
                 <div className={`max-w-[80%] rounded-lg px-4 py-3 ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-card border border-border"}`}>
+                  {msg.imageUrl && (
+                    <img src={msg.imageUrl} alt="Imagen adjunta" className="max-w-full max-h-48 rounded mb-2 object-contain" />
+                  )}
                   {msg.role === "assistant" ? (
                     <div className="prose prose-sm max-w-none text-foreground"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
                   ) : (
@@ -407,13 +478,35 @@ const BrainModule = () => {
           </div>
 
           <div className="border-t border-border px-4 py-3">
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0]); e.target.value = ""; }} />
+            <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0]); e.target.value = ""; }} />
+            {chatImagePreview && (
+              <div className="max-w-3xl mx-auto mb-2 flex items-center gap-2">
+                <img src={chatImagePreview} alt="Preview" className="h-16 w-16 object-cover rounded border border-border" />
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={clearChatImage}><X className="h-3 w-3" /></Button>
+              </div>
+            )}
             <div className="flex gap-2 max-w-3xl mx-auto items-end">
               <Button type="button" variant={voiceRecording ? "destructive" : "outline"} size="icon" onClick={toggleVoiceRecording} className="shrink-0 relative">
                 {voiceRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 {voiceRecording && <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full animate-pulse" />}
               </Button>
+              {isMobile ? (
+                <>
+                  <Button type="button" variant="outline" size="icon" onClick={() => cameraInputRef.current?.click()} className="shrink-0">
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="outline" size="icon" onClick={() => galleryInputRef.current?.click()} className="shrink-0">
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <Button type="button" variant="outline" size="icon" onClick={() => galleryInputRef.current?.click()} className="shrink-0">
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+              )}
               <Textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Pregunta sobre los documentos del proyecto..." rows={1} className="resize-none min-h-[40px] max-h-[120px]" />
-              <Button onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="shrink-0"><Send className="h-4 w-4" /></Button>
+              <Button onClick={sendMessage} disabled={(!input.trim() && !chatImage) || isLoading} size="icon" className="shrink-0"><Send className="h-4 w-4" /></Button>
             </div>
           </div>
         </div>
