@@ -22,9 +22,7 @@ const TektraSplash = ({ onFinish }: { onFinish: () => void }) => {
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-white"
           exit={{ opacity: 0 }}
           transition={{ duration: 0.6 }}
-          onAnimationComplete={() => {
-            if (stage === "done") onFinish();
-          }}
+          onAnimationComplete={() => {}}
         >
           <div className="w-[50vw] max-w-[400px]">
             <svg viewBox="0 0 598.15 306.46" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
