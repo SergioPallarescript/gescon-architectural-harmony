@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const ICON_PATH =
@@ -9,7 +9,6 @@ const K_LINE_POINTS = "228.7 189.23 280.12 240.42 300.11 240.42 239.17 179.7 228
 const LETTERS_PATH =
   "M502.5,120.44h-9.75l-48.5,107.88-27.91-45.36c8.89-1.83,16.1-5.46,21.71-10.87,5.57-5.42,8.33-12.07,8.33-19.92,0-6.2-1.83-11.66-5.49-16.44-3.66-4.75-8.59-8.48-14.8-11.21-6.24-2.73-13.08-4.07-20.55-4.07h-120.86l-68.68,62.44v-62.44H32.49v7.21h43.2v112.77h14.39v-112.77h109.26v49.17h-64.76v7.21h64.76v49.17h-74.36v7.21h91.02v-48.05l71.22-64.72h42v112.77h14.39v-112.77h61.93c7.14,0,13.12,2.2,18.01,6.65,4.86,4.45,7.29,10.39,7.29,17.86s-2.43,13.56-7.29,18.01c-4.9,4.45-10.87,6.65-18.01,6.65h-10.05l39.91,63.6h10.61l2.39-5.34,44.35-98.76,48.35,104.1h15.25l-53.85-119.98Z";
 
-// Convert polygon points to a closed path for stroke animation
 const polygonToPath = (points: string) => {
   const coords = points.trim().split(/\s+/).map(Number);
   let d = `M${coords[0]},${coords[1]}`;
@@ -29,23 +28,35 @@ const FILL_DELAY = 0.6;
 
 const TektraSplash = ({ onFinish }: { onFinish: () => void }) => {
   const [stage, setStage] = useState<"drawIcon" | "undrawIcon" | "drawText" | "done">("drawIcon");
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    setIsDark(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  const bg = isDark ? "#141414" : "#ffffff";
+  const fg = isDark ? "#ffffff" : "#1d1d1b";
 
   return (
     <AnimatePresence>
       {stage !== "done" && (
         <motion.div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-white"
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ backgroundColor: bg }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.6 }}
         >
           <div className="w-[50vw] max-w-[400px]">
             <svg viewBox="0 0 598.15 306.46" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
-              {/* Icon – solid fill fades in while stroke draws */}
               {(stage === "drawIcon" || stage === "undrawIcon") && (
                 <motion.path
                   d={ICON_PATH}
-                  fill="#1d1d1b"
-                  stroke="#1d1d1b"
+                  fill={fg}
+                  stroke={fg}
                   strokeWidth={1.5}
                   initial={
                     stage === "drawIcon"
@@ -78,14 +89,12 @@ const TektraSplash = ({ onFinish }: { onFinish: () => void }) => {
                 />
               )}
 
-              {/* Text – two elements animate in parallel */}
               {stage === "drawText" && (
                 <>
-                  {/* K diagonal line */}
                   <motion.path
                     d={K_LINE_PATH}
-                    fill="#1d1d1b"
-                    stroke="#1d1d1b"
+                    fill={fg}
+                    stroke={fg}
                     strokeWidth={1}
                     initial={{ pathLength: 0, fillOpacity: 0 }}
                     animate={{ pathLength: 1, fillOpacity: 1 }}
@@ -94,11 +103,10 @@ const TektraSplash = ({ onFinish }: { onFinish: () => void }) => {
                       fillOpacity: { duration: 0.5, delay: TEXT_DURATION * FILL_DELAY },
                     }}
                   />
-                  {/* Rest of TEKTRA letters */}
                   <motion.path
                     d={LETTERS_PATH}
-                    fill="#1d1d1b"
-                    stroke="#1d1d1b"
+                    fill={fg}
+                    stroke={fg}
                     strokeWidth={1}
                     initial={{ pathLength: 0, fillOpacity: 0 }}
                     animate={{ pathLength: 1, fillOpacity: 1 }}

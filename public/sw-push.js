@@ -1,7 +1,22 @@
 /* Service Worker for Web Push Notifications */
+/* v2 – cache-bust old PWA icons */
+
+const CACHE_VERSION = "v2";
+
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((names) =>
+      Promise.all(names.map((name) => caches.delete(name)))
+    ).then(() => self.clients.claim())
+  );
+});
 
 self.addEventListener("push", (event) => {
-  let data = { title: "GESCON", body: "Nueva notificación", url: "/" };
+  let data = { title: "TEKTRA", body: "Nueva notificación", url: "/" };
   try {
     data = event.data.json();
   } catch (e) {
@@ -9,11 +24,11 @@ self.addEventListener("push", (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.title || "GESCON", {
+    self.registration.showNotification(data.title || "TEKTRA", {
       body: data.body || data.message || "Nueva notificación",
-      icon: "/favicon.ico",
-      badge: "/favicon.ico",
-      tag: data.id || "gescon-notification",
+      icon: "/tektra-icon-192.png",
+      badge: "/tektra-icon-192.png",
+      tag: data.id || "tektra-notification",
       data: { url: data.url || "/" },
     })
   );
