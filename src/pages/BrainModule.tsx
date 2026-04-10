@@ -13,7 +13,7 @@ import ReactMarkdown from "react-markdown";
 import { syncProjectMemory } from "@/lib/projectMemory";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type Msg = { role: "user" | "assistant"; content: string; imageUrl?: string };
+type Msg = { role: "user" | "assistant"; content: string; imageUrls?: string[] };
 type Conversation = { id: string; title: string; created_at: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/brain-chat`;
@@ -36,9 +36,9 @@ const BrainModule = () => {
   const voiceRecognitionRef = useRef<any>(null);
   const isMobile = useIsMobile();
 
-  // Image upload for vision
-  const [chatImage, setChatImage] = useState<File | null>(null);
-  const [chatImagePreview, setChatImagePreview] = useState<string | null>(null);
+  // Multi-image upload for vision
+  const [chatImages, setChatImages] = useState<File[]>([]);
+  const [chatImagePreviews, setChatImagePreviews] = useState<string[]>([]);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
@@ -205,40 +205,46 @@ const BrainModule = () => {
     });
   };
 
-  const handleImageSelect = async (file: File) => {
-    setChatImage(file);
-    const preview = URL.createObjectURL(file);
-    setChatImagePreview(preview);
+  const handleImageSelect = async (files: FileList | File[]) => {
+    const fileArr = Array.from(files);
+    setChatImages(prev => [...prev, ...fileArr]);
+    const previews = fileArr.map(f => URL.createObjectURL(f));
+    setChatImagePreviews(prev => [...prev, ...previews]);
   };
 
-  const clearChatImage = () => {
-    if (chatImagePreview) URL.revokeObjectURL(chatImagePreview);
-    setChatImage(null);
-    setChatImagePreview(null);
+  const removeChatImage = (index: number) => {
+    setChatImagePreviews(prev => { URL.revokeObjectURL(prev[index]); return prev.filter((_, i) => i !== index); });
+    setChatImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllChatImages = () => {
+    chatImagePreviews.forEach(u => URL.revokeObjectURL(u));
+    setChatImages([]);
+    setChatImagePreviews([]);
   };
 
   const sendMessage = async () => {
-    if ((!input.trim() && !chatImage) || isLoading) return;
+    if ((!input.trim() && chatImages.length === 0) || isLoading) return;
     
-    let imageDataUrl: string | undefined;
-    if (chatImage) {
+    let imageDataUrls: string[] = [];
+    if (chatImages.length > 0) {
       try {
-        imageDataUrl = await compressImage(chatImage);
+        imageDataUrls = await Promise.all(chatImages.map(f => compressImage(f)));
       } catch {
-        toast.error("Error al procesar la imagen");
+        toast.error("Error al procesar las imágenes");
         return;
       }
     }
 
-    const userMsg: Msg = { role: "user", content: input.trim() || (chatImage ? "Analiza esta imagen" : ""), imageUrl: imageDataUrl };
+    const userMsg: Msg = { role: "user", content: input.trim() || (chatImages.length > 0 ? "Analiza estas imágenes" : ""), imageUrls: imageDataUrls.length > 0 ? imageDataUrls : undefined };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
-    clearChatImage();
+    clearAllChatImages();
     setIsLoading(true);
 
     const isFirstMessage = messages.length === 0;
     const convTitle = isFirstMessage ? userMsg.content.substring(0, 80) : undefined;
-    await saveMessage("user", userMsg.content + (imageDataUrl ? " [📷 Imagen adjunta]" : ""), convTitle);
+    await saveMessage("user", userMsg.content + (imageDataUrls.length > 0 ? ` [📷 ${imageDataUrls.length} imagen(es) adjunta(s)]` : ""), convTitle);
 
     let assistantSoFar = "";
     const upsertAssistant = (chunk: string) => {
@@ -271,14 +277,14 @@ const BrainModule = () => {
           ].join("\n")
         : undefined;
 
-      // Build messages for API – convert imageUrl to multimodal format
+      // Build messages for API – convert imageUrls to multimodal format
       const apiMessages = [...messages, userMsg].map(m => {
-        if (m.imageUrl) {
+        if (m.imageUrls && m.imageUrls.length > 0) {
           return {
             role: m.role,
             content: [
-              { type: "text" as const, text: m.content || "Analiza esta imagen en el contexto de la obra" },
-              { type: "image_url" as const, image_url: { url: m.imageUrl } },
+              { type: "text" as const, text: m.content || "Analiza estas imágenes en el contexto de la obra" },
+              ...m.imageUrls.map(url => ({ type: "image_url" as const, image_url: { url } })),
             ],
           };
         }
@@ -288,7 +294,7 @@ const BrainModule = () => {
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` },
-        body: JSON.stringify({ messages: apiMessages, projectContext, projectId, dynamicContext: freshDynamicMemory, hasImages: !!imageDataUrl }),
+        body: JSON.stringify({ messages: apiMessages, projectContext, projectId, dynamicContext: freshDynamicMemory, hasImages: imageDataUrls.length > 0 }),
       });
 
       if (!resp.ok) { const err = await resp.json().catch(() => ({})); throw new Error(err.error || "Error del servidor"); }
@@ -326,6 +332,8 @@ const BrainModule = () => {
     } finally { setIsLoading(false); }
   };
 
+  const brainFinalRef = useRef("");
+
   const toggleVoiceRecording = () => {
     if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) { toast.error("Tu navegador no soporta reconocimiento de voz"); return; }
     if (voiceRecording) { voiceRecognitionRef.current?.stop(); voiceRecognitionRef.current = null; setVoiceRecording(false); return; }
@@ -333,7 +341,20 @@ const BrainModule = () => {
     const recognition = new SR();
     voiceRecognitionRef.current = recognition;
     recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
-    recognition.onresult = (event: any) => { let transcript = ""; for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript; setInput(transcript); };
+    brainFinalRef.current = input;
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    recognition.onresult = (event: any) => {
+      let newFinal = ""; let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) newFinal += event.results[i][0].transcript;
+        else interim += event.results[i][0].transcript;
+      }
+      if (newFinal) brainFinalRef.current = (brainFinalRef.current + " " + newFinal).trim();
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        setInput(interim ? (brainFinalRef.current + " " + interim).trim() : brainFinalRef.current);
+      }, 80);
+    };
     recognition.onerror = (e: any) => { if (e.error === "no-speech" || e.error === "aborted") return; setVoiceRecording(false); voiceRecognitionRef.current = null; };
     recognition.onend = () => { if (voiceRecognitionRef.current) { try { recognition.start(); } catch { /* already started */ } } };
     recognition.start(); setVoiceRecording(true);
@@ -453,8 +474,12 @@ const BrainModule = () => {
                   <div className="shrink-0 w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center mt-1"><Bot className="h-4 w-4 text-accent" /></div>
                 )}
                 <div className={`max-w-[80%] rounded-lg px-4 py-3 ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-card border border-border"}`}>
-                  {msg.imageUrl && (
-                    <img src={msg.imageUrl} alt="Imagen adjunta" className="max-w-full max-h-48 rounded mb-2 object-contain" />
+                  {msg.imageUrls && msg.imageUrls.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {msg.imageUrls.map((url, idx) => (
+                        <img key={idx} src={url} alt={`Imagen ${idx + 1}`} className="max-w-[120px] max-h-36 rounded object-contain" />
+                      ))}
+                    </div>
                   )}
                   {msg.role === "assistant" ? (
                     <div className="prose prose-sm max-w-none text-foreground"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
@@ -478,12 +503,19 @@ const BrainModule = () => {
           </div>
 
           <div className="border-t border-border px-4 py-3">
-            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0]); e.target.value = ""; }} />
-            <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handleImageSelect(e.target.files[0]); e.target.value = ""; }} />
-            {chatImagePreview && (
-              <div className="max-w-3xl mx-auto mb-2 flex items-center gap-2">
-                <img src={chatImagePreview} alt="Preview" className="h-16 w-16 object-cover rounded border border-border" />
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={clearChatImage}><X className="h-3 w-3" /></Button>
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { if (e.target.files?.length) handleImageSelect(e.target.files); e.target.value = ""; }} />
+            <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files?.length) handleImageSelect(e.target.files); e.target.value = ""; }} />
+            {chatImagePreviews.length > 0 && (
+              <div className="max-w-3xl mx-auto mb-2 flex flex-wrap items-center gap-2">
+                {chatImagePreviews.map((preview, idx) => (
+                  <div key={idx} className="relative group">
+                    <img src={preview} alt={`Preview ${idx + 1}`} className="h-14 w-14 object-cover rounded border border-border" />
+                    <button onClick={() => removeChatImage(idx)} className="absolute -top-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <X className="h-2.5 w-2.5 text-destructive-foreground" />
+                    </button>
+                  </div>
+                ))}
+                <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearAllChatImages}>Quitar todas</Button>
               </div>
             )}
             <div className="flex gap-2 max-w-3xl mx-auto items-end">
@@ -506,7 +538,7 @@ const BrainModule = () => {
                 </Button>
               )}
               <Textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Pregunta sobre los documentos del proyecto..." rows={1} className="resize-none min-h-[40px] max-h-[120px]" />
-              <Button onClick={sendMessage} disabled={(!input.trim() && !chatImage) || isLoading} size="icon" className="shrink-0"><Send className="h-4 w-4" /></Button>
+              <Button onClick={sendMessage} disabled={(!input.trim() && chatImages.length === 0) || isLoading} size="icon" className="shrink-0"><Send className="h-4 w-4" /></Button>
             </div>
           </div>
         </div>
