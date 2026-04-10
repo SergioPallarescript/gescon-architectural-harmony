@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -7,6 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import LegalGateModal from "@/components/LegalGateModal";
+import TektraSplash from "@/components/TektraSplash";
+import TektraLoader from "@/components/TektraLoader";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -50,9 +52,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background concrete-bg relative">
-        <div className="relative z-10 text-center">
-          <img src="/tectra-logo.png" alt="TEKTRA" className="h-8 mx-auto" />
-          <div className="mt-4 h-6 w-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin mx-auto" />
+        <div className="relative z-10">
+          <TektraLoader size={70} />
         </div>
       </div>
     );
@@ -76,9 +77,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (termsAccepted === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background concrete-bg relative">
-        <div className="relative z-10 text-center">
-          <img src="/tectra-logo.png" alt="TEKTRA" className="h-8 mx-auto" />
-          <div className="mt-4 h-6 w-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin mx-auto" />
+        <div className="relative z-10">
+          <TektraLoader size={70} />
         </div>
       </div>
     );
@@ -93,40 +93,55 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return session ? <Navigate to="/" replace /> : <>{children}</>;
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
-            <Route path="/unsubscribe" element={<Unsubscribe />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/project/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
-            <Route path="/project/:id/plans" element={<ProtectedRoute><PlansModule /></ProtectedRoute>} />
-            <Route path="/project/:id/orders" element={<ProtectedRoute><OrdersModule /></ProtectedRoute>} />
-            <Route path="/project/:id/incidents" element={<ProtectedRoute><IncidentsModule /></ProtectedRoute>} />
-            <Route path="/project/:id/costs" element={<ProtectedRoute><CostsModule /></ProtectedRoute>} />
-            <Route path="/project/:id/dwg" element={<ProtectedRoute><DWGViewer /></ProtectedRoute>} />
-            <Route path="/project/:id/cfo" element={<ProtectedRoute><CFOModule /></ProtectedRoute>} />
-            <Route path="/project/:id/brain" element={<ProtectedRoute><BrainModule /></ProtectedRoute>} />
-            <Route path="/project/:id/docs" element={<ProtectedRoute><ProjectDocs /></ProtectedRoute>} />
-            <Route path="/project/:id/gantt" element={<ProtectedRoute><GanttModule /></ProtectedRoute>} />
-            <Route path="/project/:id/signatures" element={<ProtectedRoute><SignatureDocuments /></ProtectedRoute>} />
-            <Route path="/project/:id/subcontracting" element={<ProtectedRoute><SubcontractingModule /></ProtectedRoute>} />
-            <Route path="/project/:id/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
-            <Route path="/notifications" element={<ProtectedRoute><NotificationsHistory /></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute><GlobalAdmin /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+const ModuleLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <TektraLoader size={70} />
+  </div>
 );
+
+const App = () => {
+  const [splashDone, setSplashDone] = useState(false);
+
+  return (
+    <>
+      {!splashDone && <TektraSplash onFinish={() => setSplashDone(true)} />}
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
+              <Suspense fallback={<ModuleLoader />}>
+                <Routes>
+                  <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
+                  <Route path="/unsubscribe" element={<Unsubscribe />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/project/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
+                  <Route path="/project/:id/plans" element={<ProtectedRoute><PlansModule /></ProtectedRoute>} />
+                  <Route path="/project/:id/orders" element={<ProtectedRoute><OrdersModule /></ProtectedRoute>} />
+                  <Route path="/project/:id/incidents" element={<ProtectedRoute><IncidentsModule /></ProtectedRoute>} />
+                  <Route path="/project/:id/costs" element={<ProtectedRoute><CostsModule /></ProtectedRoute>} />
+                  <Route path="/project/:id/dwg" element={<ProtectedRoute><DWGViewer /></ProtectedRoute>} />
+                  <Route path="/project/:id/cfo" element={<ProtectedRoute><CFOModule /></ProtectedRoute>} />
+                  <Route path="/project/:id/brain" element={<ProtectedRoute><BrainModule /></ProtectedRoute>} />
+                  <Route path="/project/:id/docs" element={<ProtectedRoute><ProjectDocs /></ProtectedRoute>} />
+                  <Route path="/project/:id/gantt" element={<ProtectedRoute><GanttModule /></ProtectedRoute>} />
+                  <Route path="/project/:id/signatures" element={<ProtectedRoute><SignatureDocuments /></ProtectedRoute>} />
+                  <Route path="/project/:id/subcontracting" element={<ProtectedRoute><SubcontractingModule /></ProtectedRoute>} />
+                  <Route path="/project/:id/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
+                  <Route path="/notifications" element={<ProtectedRoute><NotificationsHistory /></ProtectedRoute>} />
+                  <Route path="/admin" element={<ProtectedRoute><GlobalAdmin /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </>
+  );
+};
 
 export default App;
