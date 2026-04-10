@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, projectContext, projectId, dynamicContext } = await req.json();
+    const { messages, projectContext, projectId, dynamicContext, hasImages } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -114,6 +114,9 @@ ${projectContext ? `\n${projectContext}` : 'No hay documentos ni historial de pr
 
 Responde siempre en español. Sé preciso y profesional.`;
 
+    // Use vision-capable model when images are present
+    const model = hasImages ? "google/gemini-2.5-flash" : "google/gemini-3-flash-preview";
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -121,7 +124,7 @@ Responde siempre en español. Sé preciso y profesional.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model,
         messages: [
           { role: "system", content: systemPrompt },
           ...messages,
