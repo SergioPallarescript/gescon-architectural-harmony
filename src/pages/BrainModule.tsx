@@ -13,7 +13,7 @@ import ReactMarkdown from "react-markdown";
 import { syncProjectMemory } from "@/lib/projectMemory";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type Msg = { role: "user" | "assistant"; content: string; imageUrl?: string };
+type Msg = { role: "user" | "assistant"; content: string; imageUrls?: string[] };
 type Conversation = { id: string; title: string; created_at: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/brain-chat`;
@@ -36,9 +36,9 @@ const BrainModule = () => {
   const voiceRecognitionRef = useRef<any>(null);
   const isMobile = useIsMobile();
 
-  // Image upload for vision
-  const [chatImage, setChatImage] = useState<File | null>(null);
-  const [chatImagePreview, setChatImagePreview] = useState<string | null>(null);
+  // Multi-image upload for vision
+  const [chatImages, setChatImages] = useState<File[]>([]);
+  const [chatImagePreviews, setChatImagePreviews] = useState<string[]>([]);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
@@ -205,16 +205,22 @@ const BrainModule = () => {
     });
   };
 
-  const handleImageSelect = async (file: File) => {
-    setChatImage(file);
-    const preview = URL.createObjectURL(file);
-    setChatImagePreview(preview);
+  const handleImageSelect = async (files: FileList | File[]) => {
+    const fileArr = Array.from(files);
+    setChatImages(prev => [...prev, ...fileArr]);
+    const previews = fileArr.map(f => URL.createObjectURL(f));
+    setChatImagePreviews(prev => [...prev, ...previews]);
   };
 
-  const clearChatImage = () => {
-    if (chatImagePreview) URL.revokeObjectURL(chatImagePreview);
-    setChatImage(null);
-    setChatImagePreview(null);
+  const removeChatImage = (index: number) => {
+    setChatImagePreviews(prev => { URL.revokeObjectURL(prev[index]); return prev.filter((_, i) => i !== index); });
+    setChatImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllChatImages = () => {
+    chatImagePreviews.forEach(u => URL.revokeObjectURL(u));
+    setChatImages([]);
+    setChatImagePreviews([]);
   };
 
   const sendMessage = async () => {

@@ -439,6 +439,7 @@ const OrdersModule = () => {
 
   // Accumulates only final (committed) speech results to avoid mobile duplication
   const finalTranscriptRef = useRef("");
+  const lastResultIndexRef = useRef(0);
 
   const toggleRecording = () => {
     if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
@@ -453,33 +454,39 @@ const OrdersModule = () => {
     recognitionRef.current = recognition;
     recognition.lang = "es-ES"; recognition.continuous = true; recognition.interimResults = true;
     finalTranscriptRef.current = content; // preserve any manually typed text
+    lastResultIndexRef.current = 0;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     recognition.onresult = (event: any) => {
-      let finalPart = "";
+      // Only process NEW results starting from resultIndex to avoid mobile duplication
+      let newFinal = "";
       let interimPart = "";
-      for (let i = 0; i < event.results.length; i++) {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
-          finalPart += result[0].transcript;
+          newFinal += result[0].transcript;
         } else {
           interimPart += result[0].transcript;
         }
       }
-      // Only accumulate final results to avoid duplication on mobile
-      if (finalPart) {
-        finalTranscriptRef.current = (finalTranscriptRef.current + " " + finalPart).trim();
+      if (newFinal) {
+        finalTranscriptRef.current = (finalTranscriptRef.current + " " + newFinal).trim();
       }
-      // Show final + current interim for live feedback
-      const display = interimPart
-        ? (finalTranscriptRef.current + " " + interimPart).trim()
-        : finalTranscriptRef.current;
-      setContent(display);
+
+      // Debounced state update to prevent rapid re-renders on mobile
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const display = interimPart
+          ? (finalTranscriptRef.current + " " + interimPart).trim()
+          : finalTranscriptRef.current;
+        setContent(display);
+      }, 80);
     };
     recognition.onerror = (e: any) => {
       if (e.error === "no-speech" || e.error === "aborted") return;
       setRecording(false); recognitionRef.current = null;
     };
-    // Silently restart on end (permissive silence handling – no beep, no partial flush)
     recognition.onend = () => {
       if (recognitionRef.current) {
         try { recognition.start(); } catch { /* already started */ }
@@ -613,8 +620,13 @@ const OrdersModule = () => {
                             {cleaning ? <><span className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> Procesando...</> : recording ? <><MicOff className="h-3 w-3" /> Parar</> : <><Mic className="h-3 w-3" /> Dictar</>}
                           </Button>
                           <Button type="button" variant="outline" size="sm" onClick={handleAIRestructure} disabled={cleaning || recording || !content.trim()} className="gap-1 text-xs">
-                            <Sparkles className="h-3 w-3" /> Reestructurar IA
+                             <Sparkles className="h-3 w-3" /> Reestructurar IA
                           </Button>
+                          {(content.trim() || structuredSections) && !recording && !cleaning && (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => { setContent(""); setStructuredSections(null); finalTranscriptRef.current = ""; }} className="gap-1 text-xs text-muted-foreground">
+                              <X className="h-3 w-3" /> Limpiar
+                            </Button>
+                          )}
                         </div>
                       </div>
                       {structuredSections ? (
