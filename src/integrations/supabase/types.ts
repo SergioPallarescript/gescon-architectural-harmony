@@ -155,11 +155,14 @@ export type Database = {
           completed_at: string | null
           completed_by: string | null
           created_at: string
+          created_by_user: string | null
           description: string | null
           file_name: string | null
           file_url: string | null
+          folder_index: number
           id: string
           is_completed: boolean
+          is_custom: boolean
           item_number: number | null
           project_id: string
           rejected_at: string | null
@@ -179,11 +182,14 @@ export type Database = {
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          created_by_user?: string | null
           description?: string | null
           file_name?: string | null
           file_url?: string | null
+          folder_index?: number
           id?: string
           is_completed?: boolean
+          is_custom?: boolean
           item_number?: number | null
           project_id: string
           rejected_at?: string | null
@@ -203,11 +209,14 @@ export type Database = {
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          created_by_user?: string | null
           description?: string | null
           file_name?: string | null
           file_url?: string | null
+          folder_index?: number
           id?: string
           is_completed?: boolean
+          is_custom?: boolean
           item_number?: number | null
           project_id?: string
           rejected_at?: string | null
