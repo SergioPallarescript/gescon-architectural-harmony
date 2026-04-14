@@ -163,16 +163,20 @@ export type Database = {
           id: string
           is_completed: boolean
           is_custom: boolean
+          is_mandatory: boolean
           item_number: number | null
           project_id: string
           rejected_at: string | null
           rejected_by: string | null
           rejection_reason: string | null
+          slot_type: string
           sort_order: number
+          text_content: string | null
           title: string
           updated_at: string
           validated_at: string | null
           validated_by_deo: boolean | null
+          volume: number
         }
         Insert: {
           allowed_roles?: string[] | null
@@ -190,16 +194,20 @@ export type Database = {
           id?: string
           is_completed?: boolean
           is_custom?: boolean
+          is_mandatory?: boolean
           item_number?: number | null
           project_id: string
           rejected_at?: string | null
           rejected_by?: string | null
           rejection_reason?: string | null
+          slot_type?: string
           sort_order?: number
+          text_content?: string | null
           title: string
           updated_at?: string
           validated_at?: string | null
           validated_by_deo?: boolean | null
+          volume?: number
         }
         Update: {
           allowed_roles?: string[] | null
@@ -217,16 +225,20 @@ export type Database = {
           id?: string
           is_completed?: boolean
           is_custom?: boolean
+          is_mandatory?: boolean
           item_number?: number | null
           project_id?: string
           rejected_at?: string | null
           rejected_by?: string | null
           rejection_reason?: string | null
+          slot_type?: string
           sort_order?: number
+          text_content?: string | null
           title?: string
           updated_at?: string
           validated_at?: string | null
           validated_by_deo?: boolean | null
+          volume?: number
         }
         Relationships: [
           {
