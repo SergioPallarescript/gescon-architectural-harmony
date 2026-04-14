@@ -15,7 +15,7 @@ import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import {
   ArrowLeft, CheckCircle2, Circle, Upload, FileText,
   Shield, Bell, Download, RefreshCw, Trash2, ChevronDown, ChevronUp, XCircle, Loader2,
-  Plus, Package, Edit2, BookOpen,
+  Plus, Edit2, BookOpen, Lock, AlertTriangle,
 } from "lucide-react";
 import DocumentPreview from "@/components/DocumentPreview";
 import {
@@ -31,20 +31,29 @@ import {
 
 type AppRole = "DO" | "DEM" | "CON" | "PRO" | "CSS";
 
-/* ── 5 LOE Folders ────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   STRUCTURE: 2 Volumes – 8 Sections (folder_index 1-8)
+   ═══════════════════════════════════════════════════════════ */
 
 interface FolderDef {
   index: number;
   title: string;
+  volume: 1 | 2;
   icon: string;
+  sectionCode?: string;
 }
 
 const FOLDERS: FolderDef[] = [
-  { index: 1, title: "Gestión Administrativa y Agentes", icon: "📋" },
-  { index: 2, title: "Seguimiento de la Dirección (Diario Legal)", icon: "📖" },
-  { index: 3, title: "Control de Calidad (Ensayos y Materiales)", icon: "🔬" },
-  { index: 4, title: "Instalaciones y Eficiencia", icon: "⚡" },
-  { index: 5, title: "Proyecto As-Built y Mantenimiento", icon: "🏗️" },
+  // Volume 1
+  { index: 1, title: "Datos Identificativos y Registrales", volume: 1, icon: "I" },
+  { index: 2, title: "Parte I — Características del Edificio", volume: 1, icon: "II" },
+  { index: 3, title: "Parte II — Manual de Mantenimiento", volume: 1, icon: "III" },
+  { index: 4, title: "Parte III — Plan de Emergencias", volume: 1, icon: "IV" },
+  // Volume 2
+  { index: 5, title: "A. Actas", volume: 2, icon: "A", sectionCode: "A" },
+  { index: 6, title: "B. Licencias", volume: 2, icon: "B", sectionCode: "B" },
+  { index: 7, title: "E. Documentos Técnicos Críticos", volume: 2, icon: "E", sectionCode: "E" },
+  { index: 8, title: "F-G. Planos y Fichas Técnicas", volume: 2, icon: "FG", sectionCode: "FG" },
 ];
 
 interface SlotDef {
@@ -53,42 +62,75 @@ interface SlotDef {
   sortOrder: number;
   allowedRoles: AppRole[];
   agentLabel: string;
+  slotType: "document" | "text" | "visual";
+  isMandatory: boolean;
+  volume: 1 | 2;
 }
 
 const DEFAULT_SLOTS: SlotDef[] = [
-  // Folder 1 – Gestión Administrativa
-  { title: "Acta de Recepción de la Obra", folderIndex: 1, sortOrder: 1, allowedRoles: ["DO", "DEM"], agentLabel: "Arquitecto / Arq. Técnico" },
-  { title: "Certificado Final de Obra (CFO)", folderIndex: 1, sortOrder: 2, allowedRoles: ["DO", "DEM"], agentLabel: "Arquitecto / Arq. Técnico" },
-  { title: "Relación de Agentes Intervinientes", folderIndex: 1, sortOrder: 3, allowedRoles: ["DO", "DEM"], agentLabel: "Arquitecto / Arq. Técnico" },
-  { title: "Certificado de Gestión de Residuos", folderIndex: 1, sortOrder: 4, allowedRoles: ["CON"], agentLabel: "Constructor" },
-  { title: "Licencia de Obra y Acta de Replanteo", folderIndex: 1, sortOrder: 5, allowedRoles: ["PRO"], agentLabel: "Promotor" },
-  // Folder 2 – Seguimiento de la Dirección
-  { title: "Libro de Órdenes (DEM)", folderIndex: 2, sortOrder: 1, allowedRoles: ["DEM"], agentLabel: "Arq. Técnico" },
-  { title: "Libro de Órdenes (DO)", folderIndex: 2, sortOrder: 2, allowedRoles: ["DO"], agentLabel: "Arquitecto" },
-  { title: "Libro de Incidencias (Cerrado y Firmado)", folderIndex: 2, sortOrder: 3, allowedRoles: ["CSS"], agentLabel: "Seguridad" },
-  { title: "Certificado de Finalización de Coordinación de Seguridad", folderIndex: 2, sortOrder: 4, allowedRoles: ["CSS"], agentLabel: "Seguridad" },
-  // Folder 3 – Control de Calidad
-  { title: "Plan de Control de Calidad", folderIndex: 3, sortOrder: 1, allowedRoles: ["DEM"], agentLabel: "Arq. Técnico" },
-  { title: "Ensayos de Laboratorio (Hormigón, Acero, Estanqueidad)", folderIndex: 3, sortOrder: 2, allowedRoles: ["CON"], agentLabel: "Constructor" },
-  { title: "Fichas Técnicas y Marcado CE", folderIndex: 3, sortOrder: 3, allowedRoles: ["CON"], agentLabel: "Constructor" },
-  { title: "Dossier de Carpintería y Vidrio", folderIndex: 3, sortOrder: 4, allowedRoles: ["CON"], agentLabel: "Constructor" },
-  // Folder 4 – Instalaciones
-  { title: "Certificados de Instalaciones (CIE, Fontanería, Gas)", folderIndex: 4, sortOrder: 1, allowedRoles: ["CON"], agentLabel: "Constructor" },
-  { title: "Certificado de Eficiencia Energética (CEE) Final", folderIndex: 4, sortOrder: 2, allowedRoles: ["CON"], agentLabel: "Constructor" },
-  { title: "Certificado de Telecomunicaciones (ICT)", folderIndex: 4, sortOrder: 3, allowedRoles: ["CON"], agentLabel: "Constructor" },
-  { title: "Certificado de Climatización/RITE", folderIndex: 4, sortOrder: 4, allowedRoles: ["CON"], agentLabel: "Constructor" },
-  // Folder 5 – As-Built
-  { title: "Planos Finales \"As-Built\"", folderIndex: 5, sortOrder: 1, allowedRoles: ["DO", "DEM"], agentLabel: "Arquitecto / Arq. Técnico" },
-  { title: "Manual de Uso y Mantenimiento", folderIndex: 5, sortOrder: 2, allowedRoles: ["DO", "DEM"], agentLabel: "Arquitecto / Arq. Técnico" },
+  /* ── Folder 1: Datos Identificativos (text slots) ───── */
+  { title: "Municipio", folderIndex: 1, sortOrder: 1, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: true, volume: 1 },
+  { title: "Emplazamiento", folderIndex: 1, sortOrder: 2, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: true, volume: 1 },
+  { title: "Código Postal", folderIndex: 1, sortOrder: 3, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: true, volume: 1 },
+  { title: "Referencia Catastral (NRC)", folderIndex: 1, sortOrder: 4, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: true, volume: 1 },
+  { title: "Registro Nº", folderIndex: 1, sortOrder: 5, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Tomo", folderIndex: 1, sortOrder: 6, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Libro", folderIndex: 1, sortOrder: 7, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Folio", folderIndex: 1, sortOrder: 8, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Finca", folderIndex: 1, sortOrder: 9, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Póliza Decenal — Compañía", folderIndex: 1, sortOrder: 10, allowedRoles: ["PRO"], agentLabel: "Promotor", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Póliza Decenal — Número", folderIndex: 1, sortOrder: 11, allowedRoles: ["PRO"], agentLabel: "Promotor", slotType: "text", isMandatory: false, volume: 1 },
+
+  /* ── Folder 2: Parte I – Características ──────────── */
+  { title: "Plano de Emplazamiento", folderIndex: 2, sortOrder: 1, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "visual", isMandatory: true, volume: 1 },
+  { title: "Fotos de Fachada", folderIndex: 2, sortOrder: 2, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "visual", isMandatory: false, volume: 1 },
+  { title: "Relación de Agentes Intervinientes", folderIndex: 2, sortOrder: 3, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "document", isMandatory: true, volume: 1 },
+  { title: "Cuadro Cronológico de las Obras (Fechas y Licencias)", folderIndex: 2, sortOrder: 4, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Tabla de Superficies y Coeficientes", folderIndex: 2, sortOrder: 5, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Memoria Detallada de Materiales y Calidades", folderIndex: 2, sortOrder: 6, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+
+  /* ── Folder 3: Parte II – Mantenimiento ─────────── */
+  { title: "Fichas de Mantenimiento — Limitaciones de Uso (L)", folderIndex: 3, sortOrder: 1, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Fichas de Mantenimiento — Instrucciones de Uso (I)", folderIndex: 3, sortOrder: 2, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Fichas de Mantenimiento — Prohibiciones (N)", folderIndex: 3, sortOrder: 3, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Fichas de Mantenimiento — Revisiones Periódicas (R)", folderIndex: 3, sortOrder: 4, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+
+  /* ── Folder 4: Parte III – Emergencias ──────────── */
+  { title: "Protocolo de Actuación ante Incendio", folderIndex: 4, sortOrder: 1, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Protocolo de Actuación ante Inundación", folderIndex: 4, sortOrder: 2, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+  { title: "Protocolo de Actuación ante Sismo", folderIndex: 4, sortOrder: 3, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "text", isMandatory: false, volume: 1 },
+
+  /* ── Folder 5: A. Actas ─────────────────────────── */
+  { title: "Certificado Final de Obra (CFO)", folderIndex: 5, sortOrder: 1, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "document", isMandatory: true, volume: 2 },
+  { title: "Acta de Replanteo", folderIndex: 5, sortOrder: 2, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "document", isMandatory: true, volume: 2 },
+  { title: "Acta de Recepción (Terminada)", folderIndex: 5, sortOrder: 3, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "document", isMandatory: true, volume: 2 },
+
+  /* ── Folder 6: B. Licencias ─────────────────────── */
+  { title: "Declaración Responsable Urbanística", folderIndex: 6, sortOrder: 1, allowedRoles: ["PRO", "DO"], agentLabel: "Promotor / DO", slotType: "document", isMandatory: false, volume: 2 },
+  { title: "Licencias Históricas", folderIndex: 6, sortOrder: 2, allowedRoles: ["PRO", "DO"], agentLabel: "Promotor / DO", slotType: "document", isMandatory: false, volume: 2 },
+
+  /* ── Folder 7: E. Documentos Técnicos Críticos ──── */
+  { title: "Certificado de Gestión de Residuos (RCD)", folderIndex: 7, sortOrder: 1, allowedRoles: ["CON"], agentLabel: "Constructor", slotType: "document", isMandatory: true, volume: 2 },
+  { title: "Certificado de Eficiencia Energética (CEE) + Registro + Etiqueta", folderIndex: 7, sortOrder: 2, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "document", isMandatory: true, volume: 2 },
+  { title: "Liquidación Final y Facturas de Obra", folderIndex: 7, sortOrder: 3, allowedRoles: ["CON"], agentLabel: "Constructor", slotType: "document", isMandatory: false, volume: 2 },
+  { title: "Escrituras de Cambio de Uso y Modelo 900D (Catastro)", folderIndex: 7, sortOrder: 4, allowedRoles: ["PRO"], agentLabel: "Promotor", slotType: "document", isMandatory: false, volume: 2 },
+  { title: "Certificados de Instalaciones (CIE, Fontanería, Gas)", folderIndex: 7, sortOrder: 5, allowedRoles: ["CON"], agentLabel: "Constructor", slotType: "document", isMandatory: false, volume: 2 },
+  { title: "Certificado de Telecomunicaciones (ICT)", folderIndex: 7, sortOrder: 6, allowedRoles: ["CON"], agentLabel: "Constructor", slotType: "document", isMandatory: false, volume: 2 },
+  { title: "Certificado de Climatización/RITE", folderIndex: 7, sortOrder: 7, allowedRoles: ["CON"], agentLabel: "Constructor", slotType: "document", isMandatory: false, volume: 2 },
+
+  /* ── Folder 8: F-G. Planos y Fichas ─────────────── */
+  { title: "Planos Finales As-Built", folderIndex: 8, sortOrder: 1, allowedRoles: ["DO", "DEM"], agentLabel: "DF", slotType: "document", isMandatory: true, volume: 2 },
+  { title: "Fichas Técnicas de Materiales (Porcelánicos, Sanitarios, Aislantes, etc.)", folderIndex: 8, sortOrder: 2, allowedRoles: ["CON"], agentLabel: "Constructor", slotType: "document", isMandatory: false, volume: 2 },
+  { title: "Marcado CE de Materiales", folderIndex: 8, sortOrder: 3, allowedRoles: ["CON"], agentLabel: "Constructor", slotType: "document", isMandatory: false, volume: 2 },
 ];
 
 const roleLabels: Record<string, string> = {
   DO: "Director de Obra", DEM: "Director de Ejecución", CON: "Constructor", PRO: "Promotor", CSS: "Coordinador de Seguridad",
 };
 
-const roleShort: Record<string, string> = {
-  DO: "DO", DEM: "DEM", CON: "CON", PRO: "PRO", CSS: "CSS",
-};
+/* ═══════════════════════════════════════════════════════════
+   COMPONENT
+   ═══════════════════════════════════════════════════════════ */
 
 const CFOModule = () => {
   const { id: projectId } = useParams<{ id: string }>();
@@ -106,13 +148,19 @@ const CFOModule = () => {
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; item: any | null }>({ open: false, item: null });
   const [rejectReason, setRejectReason] = useState("");
-  const [openFolders, setOpenFolders] = useState<Record<number, boolean>>({ 1: true, 2: true, 3: true, 4: true, 5: true });
+  const [openFolders, setOpenFolders] = useState<Record<number, boolean>>(() => {
+    const initial: Record<number, boolean> = {};
+    FOLDERS.forEach(f => { initial[f.index] = true; });
+    return initial;
+  });
 
   // New slot dialog
   const [newSlotOpen, setNewSlotOpen] = useState(false);
   const [newSlotTitle, setNewSlotTitle] = useState("");
-  const [newSlotFolder, setNewSlotFolder] = useState("1");
+  const [newSlotFolder, setNewSlotFolder] = useState("5");
   const [newSlotRole, setNewSlotRole] = useState<AppRole>("CON");
+  const [newSlotType, setNewSlotType] = useState<"document" | "text">("document");
+  const [newSlotMandatory, setNewSlotMandatory] = useState(false);
 
   // Edit slot dialog
   const [editSlotOpen, setEditSlotOpen] = useState(false);
@@ -134,112 +182,161 @@ const CFOModule = () => {
     });
   }, [projectId]);
 
+  /* ── Migration: detect old 5-folder or old structure → new 8-folder ── */
   const migrateOldStructure = useCallback(async (existingItems: any[]) => {
-    if (!projectId) return;
+    if (!projectId) return null;
 
-    // Detect old structure: items exist but all non-custom items have folder_index=1
+    // Detect: if any item has folder_index > 5 we already have new structure
+    const hasNewStructure = existingItems.some(i => i.folder_index > 5);
+    if (hasNewStructure) return null;
+
+    // Check if it's the old 5-folder LOE structure (folder_index 1-5 but no volume field set)
+    // or the even older 16-slot structure (all folder_index=1)
     const nonCustom = existingItems.filter(i => !i.is_custom);
-    const hasNewStructure = nonCustom.some(i => i.folder_index > 1);
-    if (hasNewStructure) return null; // already migrated
+    const maxFolder = Math.max(...nonCustom.map(i => i.folder_index || 1), 0);
 
-    // Separate items with uploaded files (preserve) from empty ones (delete & re-seed)
+    // Preserve items with uploaded files
     const withFiles = existingItems.filter(i => i.is_completed && i.file_url);
-    const emptyNonCustom = existingItems.filter(i => !i.is_custom && !(i.is_completed && i.file_url));
+    const withoutFiles = existingItems.filter(i => !(i.is_completed && i.file_url));
     const customItems = existingItems.filter(i => i.is_custom);
 
-    // Delete empty non-custom old items
+    // Delete non-custom empty items
+    const emptyNonCustom = withoutFiles.filter(i => !i.is_custom);
     if (emptyNonCustom.length > 0) {
-      const ids = emptyNonCustom.map(i => i.id);
-      await supabase.from("cfo_items").delete().in("id", ids);
+      await supabase.from("cfo_items").delete().in("id", emptyNonCustom.map(i => i.id));
     }
 
-    // Try to map old items with files to new slots by title similarity
-    const mappedFileIds = new Set<string>();
+    // Try to map old files to new structure by title similarity
     for (const item of withFiles) {
-      const match = DEFAULT_SLOTS.find(s => item.title?.toLowerCase().includes(s.title.toLowerCase().slice(0, 15)));
+      const titleLower = (item.title || "").toLowerCase();
+      const match = DEFAULT_SLOTS.find(s => {
+        const sLower = s.title.toLowerCase();
+        return titleLower.includes(sLower.slice(0, 20)) || sLower.includes(titleLower.slice(0, 20));
+      });
       if (match) {
+        const folder = FOLDERS.find(f => f.index === match.folderIndex)!;
         await supabase.from("cfo_items").update({
           folder_index: match.folderIndex,
           sort_order: match.sortOrder,
           allowed_roles: match.allowedRoles,
-          category: FOLDERS.find(f => f.index === match.folderIndex)?.title || "",
+          category: folder.title,
+          slot_type: match.slotType,
+          is_mandatory: match.isMandatory,
+          volume: match.volume,
         }).eq("id", item.id);
-        mappedFileIds.add(item.id);
       } else {
-        // Put unmapped files in folder 1
-        await supabase.from("cfo_items").update({ folder_index: 1, sort_order: 99 }).eq("id", item.id);
+        // Put unmapped files in folder 7 (technical docs)
+        await supabase.from("cfo_items").update({
+          folder_index: 7, sort_order: 99, volume: 2, slot_type: "document",
+        }).eq("id", item.id);
       }
     }
 
-    // Insert new default slots that don't conflict with preserved file items
-    const preservedTitles = new Set(withFiles.map(i => i.title?.toLowerCase()));
+    // Insert new default slots that don't conflict
+    const preservedTitles = new Set(withFiles.map(i => (i.title || "").toLowerCase()));
     const newInserts = DEFAULT_SLOTS
       .filter(slot => !preservedTitles.has(slot.title.toLowerCase()))
       .map((slot, idx) => ({
         project_id: projectId,
-        category: FOLDERS.find(f => f.index === slot.folderIndex)?.title || "",
+        category: FOLDERS.find(f => f.index === slot.folderIndex)!.title,
         title: slot.title,
         sort_order: slot.sortOrder,
         item_number: idx + 1,
         allowed_roles: slot.allowedRoles,
         folder_index: slot.folderIndex,
         is_custom: false,
+        slot_type: slot.slotType,
+        is_mandatory: slot.isMandatory,
+        volume: slot.volume,
       }));
 
     if (newInserts.length > 0) {
       await supabase.from("cfo_items").insert(newInserts);
     }
 
-    // Re-fetch after migration
-    const { data: fresh } = await supabase.from("cfo_items").select("*").eq("project_id", projectId).order("folder_index", { ascending: true }).order("sort_order", { ascending: true });
+    const { data: fresh } = await supabase.from("cfo_items").select("*")
+      .eq("project_id", projectId)
+      .order("folder_index", { ascending: true })
+      .order("sort_order", { ascending: true });
     return fresh;
   }, [projectId]);
 
   const fetchItems = useCallback(async () => {
     if (!projectId) return;
-    const { data } = await supabase.from("cfo_items").select("*").eq("project_id", projectId).order("folder_index", { ascending: true }).order("sort_order", { ascending: true });
+    const { data } = await supabase.from("cfo_items").select("*")
+      .eq("project_id", projectId)
+      .order("folder_index", { ascending: true })
+      .order("sort_order", { ascending: true });
     if (data && data.length > 0) {
-      // Check if old structure needs migration
       const migrated = await migrateOldStructure(data);
       setItems(migrated || data);
-      setLoading(false);
     } else {
       await initializeChecklist();
-      setLoading(false);
     }
+    setLoading(false);
   }, [projectId, migrateOldStructure]);
 
   const initializeChecklist = async () => {
     if (!projectId) return;
     const inserts = DEFAULT_SLOTS.map((slot, idx) => ({
       project_id: projectId,
-      category: FOLDERS.find(f => f.index === slot.folderIndex)?.title || "",
+      category: FOLDERS.find(f => f.index === slot.folderIndex)!.title,
       title: slot.title,
       sort_order: slot.sortOrder,
       item_number: idx + 1,
       allowed_roles: slot.allowedRoles,
       folder_index: slot.folderIndex,
       is_custom: false,
+      slot_type: slot.slotType,
+      is_mandatory: slot.isMandatory,
+      volume: slot.volume,
     }));
     const { data, error } = await supabase.from("cfo_items").insert(inserts).select();
     if (error) {
-      const { data: retryData } = await supabase.from("cfo_items").select("*").eq("project_id", projectId).order("folder_index", { ascending: true }).order("sort_order", { ascending: true });
+      const { data: retryData } = await supabase.from("cfo_items").select("*")
+        .eq("project_id", projectId)
+        .order("folder_index", { ascending: true })
+        .order("sort_order", { ascending: true });
       if (retryData) setItems(retryData);
-    } else if (data) { setItems(data); }
+    } else if (data) {
+      setItems(data);
+    }
   };
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
+  /* ── Permissions ──────────────────────────────────── */
   const canUploadItem = (item: any): boolean => {
     if (!userRole) return false;
+    // DF (DO/DEM) can upload to ANY slot
+    if (isAdmin) return true;
     return (item.allowed_roles || []).includes(userRole);
   };
 
+  // DF can manage (replace/delete) ANY uploaded file
   const canManageUploadedItem = (item: any): boolean => {
     if (!user) return false;
+    if (isAdmin) return true;
     return Boolean(item.is_completed && item.completed_by === user.id && !item.validated_by_deo);
   };
 
+  const canEditTextSlot = (item: any): boolean => {
+    if (!userRole) return false;
+    if (isAdmin) return true;
+    return (item.allowed_roles || []).includes(userRole);
+  };
+
+  /* ── Slot type helpers ───────────────────────────── */
+  const isTextSlot = (item: any) => item.slot_type === "text";
+  const isVisualSlot = (item: any) => item.slot_type === "visual";
+  const isDocumentSlot = (item: any) => !item.slot_type || item.slot_type === "document";
+
+  const isSlotFilled = (item: any): boolean => {
+    if (isTextSlot(item)) return !!(item.text_content && item.text_content.trim());
+    return item.is_completed && !!item.file_url;
+  };
+
+  /* ── Handlers ─────────────────────────────────────── */
   const togglePreview = async (item: any) => {
     if (expandedItem === item.id) { setExpandedItem(null); return; }
     setExpandedItem(item.id);
@@ -290,7 +387,7 @@ const CFOModule = () => {
         completed_at: new Date().toISOString(), completed_by: user.id,
         validated_by_deo: null, validated_at: null,
         rejection_reason: null, rejected_by: null, rejected_at: null,
-      }).eq("id", item.id).eq("completed_by", user.id);
+      }).eq("id", item.id);
       if (updateError) throw updateError;
       if (previousPath && previousPath !== nextPath) await supabase.storage.from("plans").remove([previousPath]);
       if (previewUrls[item.id]) { URL.revokeObjectURL(previewUrls[item.id]); setPreviewUrls(prev => { const n = { ...prev }; delete n[item.id]; return n; }); }
@@ -309,7 +406,7 @@ const CFOModule = () => {
       await supabase.from("cfo_items").update({
         is_completed: false, completed_at: null, completed_by: null,
         file_url: null, file_name: null, validated_by_deo: null, validated_at: null,
-      }).eq("id", item.id).eq("completed_by", user.id);
+      }).eq("id", item.id);
       if (previewUrls[item.id]) { URL.revokeObjectURL(previewUrls[item.id]); setPreviewUrls(prev => { const n = { ...prev }; delete n[item.id]; return n; }); }
       setExpandedItem(null);
       toast.success("Documento eliminado"); await fetchItems();
@@ -319,7 +416,7 @@ const CFOModule = () => {
 
   const handleDeleteSlot = async (item: any) => {
     if (!projectId || !user || !isAdmin) return;
-    const confirmed = window.confirm(`¿Eliminar el requerimiento "${item.title}"? Esta acción no se puede deshacer.`);
+    const confirmed = window.confirm(`¿Eliminar "${item.title}"? Esta acción no se puede deshacer.`);
     if (!confirmed) return;
     try {
       if (item.file_url) await supabase.storage.from("plans").remove([item.file_url]);
@@ -337,13 +434,26 @@ const CFOModule = () => {
     fetchItems();
   };
 
+  const handleSaveTextContent = async (itemId: string, textContent: string) => {
+    if (!user || !projectId) return;
+    await supabase.from("cfo_items").update({
+      text_content: textContent,
+      is_completed: !!textContent.trim(),
+      completed_at: textContent.trim() ? new Date().toISOString() : null,
+      completed_by: textContent.trim() ? user.id : null,
+    }).eq("id", itemId);
+    toast.success("Guardado");
+    fetchItems();
+  };
+
   const handleAudit = async () => {
     setAuditing(true); await fetchItems();
     setTimeout(async () => {
-      const pending = items.filter((i) => !i.is_completed);
-      if (pending.length === 0) { toast.success("✅ Todos los documentos están completos"); }
+      const pending = items.filter((i) => !isSlotFilled(i));
+      if (pending.length === 0) { toast.success("Todos los documentos están completos"); }
       else {
-        toast.warning(`⚠️ ${pending.length} documentos pendientes`);
+        const mandatoryPending = pending.filter(i => i.is_mandatory);
+        toast.warning(`${pending.length} documentos pendientes (${mandatoryPending.length} obligatorios)`);
         if (user && projectId) {
           for (const pItem of pending) {
             const allowedRoles: string[] = pItem.allowed_roles || ["CON"];
@@ -352,8 +462,8 @@ const CFOModule = () => {
             for (const target of targets) {
               await notifyUser({
                 userId: target.user_id, projectId,
-                title: "⚠️ Auditoría CFO: Documento Pendiente",
-                message: `El documento "${pItem.title}" sigue pendiente de entrega.`,
+                title: "Auditoría LdE: Documento Pendiente",
+                message: `El documento "${pItem.title}" sigue pendiente de entrega.${pItem.is_mandatory ? " (OBLIGATORIO)" : ""}`,
                 type: "cfo_claim",
               });
             }
@@ -363,7 +473,7 @@ const CFOModule = () => {
       setAuditing(false);
     }, 500);
     if (user && projectId) {
-      await supabase.from("audit_logs").insert({ user_id: user.id, project_id: projectId, action: "cfo_audit_scan", details: { pending_count: items.filter((i) => !i.is_completed).length } });
+      await supabase.from("audit_logs").insert({ user_id: user.id, project_id: projectId, action: "cfo_audit_scan", details: { pending_count: items.filter((i) => !isSlotFilled(i)).length } });
     }
   };
 
@@ -375,13 +485,13 @@ const CFOModule = () => {
     for (const target of targets) {
       await notifyUser({
         userId: target.user_id, projectId: projectId!,
-        title: "⚠️ Reclamación de Documento CFO",
+        title: "Reclamación de Documento LdE",
         message: `Atención: Se solicita la subida inmediata del documento pendiente: "${item.title}".`,
         type: "cfo_claim",
       });
     }
     await supabase.from("cfo_items").update({ claimed_at: new Date().toISOString(), claimed_by: user.id }).eq("id", item.id);
-    toast.success(`Reclamación enviada`);
+    toast.success("Reclamación enviada");
     setClaimDialog({ open: false, item: null }); fetchItems();
   };
 
@@ -401,7 +511,7 @@ const CFOModule = () => {
     if (rejectDialog.item.completed_by && projectId) {
       await notifyUser({
         userId: rejectDialog.item.completed_by, projectId,
-        title: "❌ Documento CFO Rechazado",
+        title: "Documento LdE Rechazado",
         message: `El documento "${rejectDialog.item.title}" ha sido rechazado. Motivo: ${rejectReason || "Sin motivo especificado"}`,
         type: "cfo_rejection",
       });
@@ -410,48 +520,125 @@ const CFOModule = () => {
     setRejectDialog({ open: false, item: null }); setRejectReason(""); fetchItems();
   };
 
-  /* ── PDF Export: Libro del Edificio ─────────────────────── */
+  /* ── Create Custom Slot ────────────────────────────── */
+  const handleCreateSlot = async () => {
+    if (!projectId || !user || !newSlotTitle.trim()) return;
+    const folderIdx = parseInt(newSlotFolder);
+    const folder = FOLDERS.find(f => f.index === folderIdx)!;
+    const folderItems = items.filter(i => (i.folder_index || 1) === folderIdx);
+    const maxSort = folderItems.reduce((max, i) => Math.max(max, i.sort_order || 0), 0);
+    const maxItemNum = items.reduce((max, i) => Math.max(max, i.item_number || 0), 0);
+
+    const { error } = await supabase.from("cfo_items").insert({
+      project_id: projectId,
+      category: folder.title,
+      title: newSlotTitle.trim(),
+      sort_order: maxSort + 1,
+      item_number: maxItemNum + 1,
+      allowed_roles: [newSlotRole],
+      folder_index: folderIdx,
+      is_custom: true,
+      created_by_user: user.id,
+      slot_type: newSlotType,
+      is_mandatory: newSlotMandatory,
+      volume: folder.volume,
+    });
+    if (error) { toast.error("Error al crear requerimiento"); return; }
+
+    // Notify assigned agent
+    const { data: members } = await supabase.from("project_members").select("user_id, role").eq("project_id", projectId).eq("status", "accepted");
+    const targets = (members || []).filter((m: any) => m.role === newSlotRole && m.user_id && m.user_id !== user.id);
+    for (const target of targets) {
+      await notifyUser({
+        userId: target.user_id, projectId,
+        title: "Nueva Tarea Pendiente — LdE",
+        message: `Se te ha asignado un nuevo requerimiento: "${newSlotTitle.trim()}"`,
+        type: "cfo_claim",
+      });
+    }
+
+    toast.success("Nuevo requerimiento creado");
+    setNewSlotOpen(false); setNewSlotTitle(""); setNewSlotFolder("5"); setNewSlotRole("CON"); setNewSlotType("document"); setNewSlotMandatory(false);
+    fetchItems();
+  };
+
+  /* ── Compilation Check ─────────────────────────────── */
+  const mandatoryItems = items.filter(i => i.is_mandatory);
+  const mandatoryFilled = mandatoryItems.filter(i => isSlotFilled(i));
+  const canCompile = mandatoryItems.length > 0 && mandatoryFilled.length === mandatoryItems.length;
+  const missingMandatory = mandatoryItems.filter(i => !isSlotFilled(i));
+
+  /* ── PDF Export: Libro del Edificio (2 Volumes) ────── */
   const handleExportPDF = async () => {
+    if (!canCompile) {
+      toast.error(`No se puede compilar. Faltan ${missingMandatory.length} documentos obligatorios: ${missingMandatory.map(m => m.title).join(", ")}`);
+      return;
+    }
     setExporting(true);
     try {
       const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
       const pdfDoc = await PDFDocument.create();
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      const fontSize = 10;
       const projectName = projectInfo?.name || "Proyecto";
       const projectAddress = projectInfo?.address || "";
+      const refCatastral = projectInfo?.referencia_catastral || "";
       const today = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+      // Get registration data from text slots
+      const getTextValue = (title: string) => {
+        const item = items.find(i => i.title === title && isTextSlot(i));
+        return item?.text_content?.trim() || "";
+      };
+
+      const registroData = {
+        municipio: getTextValue("Municipio"),
+        emplazamiento: getTextValue("Emplazamiento"),
+        cp: getTextValue("Código Postal"),
+        nrc: getTextValue("Referencia Catastral (NRC)") || refCatastral,
+        registro: getTextValue("Registro Nº"),
+        tomo: getTextValue("Tomo"),
+        libro: getTextValue("Libro"),
+        folio: getTextValue("Folio"),
+        finca: getTextValue("Finca"),
+        polizaCompania: getTextValue("Póliza Decenal — Compañía"),
+        polizaNumero: getTextValue("Póliza Decenal — Número"),
+      };
 
       const addFooter = (page: any, pageNum: number, totalPages: number) => {
         const { width } = page.getSize();
-        page.drawText(`${projectName}`, { x: 50, y: 25, size: 7, font, color: rgb(0.5, 0.5, 0.5) });
-        page.drawText(`Página ${pageNum} de ${totalPages}`, { x: width - 130, y: 25, size: 7, font, color: rgb(0.5, 0.5, 0.5) });
+        page.drawText(projectName, { x: 50, y: 25, size: 7, font, color: rgb(0.5, 0.5, 0.5) });
+        page.drawText(`Pagina ${pageNum} de ${totalPages}`, { x: width - 130, y: 25, size: 7, font, color: rgb(0.5, 0.5, 0.5) });
       };
 
-      // ── Page 1: Cover ──
-      const coverPage = pdfDoc.addPage([595, 842]);
-      const { width: cw, height: ch } = coverPage.getSize();
-      coverPage.drawText("LIBRO DEL EDIFICIO", { x: 50, y: ch - 200, size: 28, font: fontBold, color: rgb(0, 0, 0) });
-      coverPage.drawText("CFO — Certificado Final de Obra", { x: 50, y: ch - 240, size: 14, font, color: rgb(0.3, 0.3, 0.3) });
-      coverPage.drawLine({ start: { x: 50, y: ch - 260 }, end: { x: cw - 50, y: ch - 260 }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
-      coverPage.drawText(projectName, { x: 50, y: ch - 310, size: 18, font: fontBold, color: rgb(0, 0, 0) });
-      if (projectAddress) coverPage.drawText(projectAddress, { x: 50, y: ch - 340, size: 12, font, color: rgb(0.3, 0.3, 0.3) });
-      if (projectInfo?.referencia_catastral) coverPage.drawText(`Ref. Catastral: ${projectInfo.referencia_catastral}`, { x: 50, y: ch - 370, size: 11, font, color: rgb(0.4, 0.4, 0.4) });
-      coverPage.drawText(`Fecha de emisión: ${today}`, { x: 50, y: ch - 420, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+      /* ── COVER: Volume 1 ── */
+      const coverV1 = pdfDoc.addPage([595, 842]);
+      const { height: ch } = coverV1.getSize();
+      coverV1.drawText("LIBRO DEL EDIFICIO", { x: 50, y: ch - 180, size: 28, font: fontBold, color: rgb(0, 0, 0) });
+      coverV1.drawText("VOLUMEN 1 — EL CUERPO DEL LIBRO", { x: 50, y: ch - 215, size: 14, font: fontBold, color: rgb(0.3, 0.3, 0.3) });
+      coverV1.drawText("Partes I, II y III", { x: 50, y: ch - 240, size: 11, font, color: rgb(0.4, 0.4, 0.4) });
+      coverV1.drawLine({ start: { x: 50, y: ch - 260 }, end: { x: 545, y: ch - 260 }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
+      coverV1.drawText(projectName, { x: 50, y: ch - 300, size: 18, font: fontBold });
+      if (projectAddress) coverV1.drawText(projectAddress, { x: 50, y: ch - 325, size: 11, font, color: rgb(0.3, 0.3, 0.3) });
+      if (registroData.nrc) coverV1.drawText(`Ref. Catastral: ${registroData.nrc}`, { x: 50, y: ch - 350, size: 11, font, color: rgb(0.4, 0.4, 0.4) });
+      if (registroData.municipio) coverV1.drawText(`Municipio: ${registroData.municipio}`, { x: 50, y: ch - 375, size: 10, font, color: rgb(0.4, 0.4, 0.4) });
+      if (registroData.registro) {
+        coverV1.drawText(`Registro: ${registroData.registro} | Tomo: ${registroData.tomo} | Libro: ${registroData.libro} | Folio: ${registroData.folio} | Finca: ${registroData.finca}`, { x: 50, y: ch - 400, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
+      }
+      coverV1.drawText(`Fecha de emision: ${today}`, { x: 50, y: ch - 450, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
 
-      // Collect document pages structure for TOC
-      interface TocEntry { title: string; page: number; isFolder: boolean; }
+      // Collect all content pages for TOC calculation
+      interface TocEntry { title: string; page: number; isFolder: boolean; volume: number; }
       const tocEntries: TocEntry[] = [];
+      const vol1Folders = FOLDERS.filter(f => f.volume === 1);
+      const vol2Folders = FOLDERS.filter(f => f.volume === 2);
 
-      // First: download all completed docs and calculate page counts
-      const folderDocsMap: { folder: FolderDef; items: any[]; docBlobs: { item: any; blob: Blob; pageCount: number }[] }[] = [];
-
+      // Pre-calculate document page counts
+      const folderDocsMap: Map<number, { item: any; blob: Blob; pageCount: number }[]> = new Map();
       for (const folder of FOLDERS) {
         const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
         const completedDocs = folderItems.filter(i => i.is_completed && i.file_url);
         const docBlobs: { item: any; blob: Blob; pageCount: number }[] = [];
-
         for (const item of completedDocs) {
           const { data } = await supabase.storage.from("plans").download(item.file_url);
           if (data) {
@@ -461,83 +648,134 @@ const CFOModule = () => {
                 const arrBuf = await data.arrayBuffer();
                 const srcDoc = await PDFDocument.load(arrBuf);
                 docBlobs.push({ item, blob: data, pageCount: srcDoc.getPageCount() });
-              } catch {
-                docBlobs.push({ item, blob: data, pageCount: 1 });
-              }
+              } catch { docBlobs.push({ item, blob: data, pageCount: 1 }); }
             } else {
               docBlobs.push({ item, blob: data, pageCount: 1 });
             }
           }
         }
-        folderDocsMap.push({ folder, items: folderItems, docBlobs });
+        folderDocsMap.set(folder.index, docBlobs);
       }
 
-      // Calculate TOC entry count to determine how many TOC pages we need
+      // Calculate TOC size
       let tocEntryCount = 0;
-      for (const { folder, docBlobs } of folderDocsMap) {
+      for (const folder of FOLDERS) {
         tocEntryCount++; // folder header
-        tocEntryCount += docBlobs.length; // docs
+        const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
+        const textItems = folderItems.filter(i => isTextSlot(i) && i.text_content?.trim());
+        const docItems = folderDocsMap.get(folder.index) || [];
+        tocEntryCount += textItems.length + docItems.length;
       }
-      const tocLineHeight = 18; // average between folder (22) and doc (16)
-      const tocLinesPerPage = Math.floor((842 - 100 - 60) / tocLineHeight);
+      tocEntryCount += 2; // Volume separators
+      const tocLinesPerPage = Math.floor((842 - 120) / 18);
       const tocPageCount = Math.max(1, Math.ceil(tocEntryCount / tocLinesPerPage));
 
-      // Now calculate page numbers: cover (1) + TOC pages + content
-      let currentPage = 1 + tocPageCount + 1; // +1 because currentPage starts at next page after TOC
-      for (const { folder, docBlobs } of folderDocsMap) {
-        tocEntries.push({ title: folder.title, page: currentPage, isFolder: true });
-        currentPage++; // separator page
+      // Page counting: Cover V1 (1) + TOC pages + content...
+      let currentPage = 1 + tocPageCount + 1;
+
+      // Volume 1 content
+      for (const folder of vol1Folders) {
+        tocEntries.push({ title: folder.title, page: currentPage, isFolder: true, volume: 1 });
+        currentPage++; // section separator
+        const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
+        const textItems = folderItems.filter(i => isTextSlot(i) && i.text_content?.trim());
+        if (textItems.length > 0) {
+          tocEntries.push({ title: "Datos de texto", page: currentPage, isFolder: false, volume: 1 });
+          currentPage++; // text page
+        }
+        const docBlobs = folderDocsMap.get(folder.index) || [];
         for (const { item, pageCount } of docBlobs) {
-          tocEntries.push({ title: item.title, page: currentPage, isFolder: false });
+          tocEntries.push({ title: item.title, page: currentPage, isFolder: false, volume: 1 });
           currentPage += pageCount;
         }
       }
+
+      // Cover V2
+      tocEntries.push({ title: "VOLUMEN 2 — ARCHIVO VIVO (Parte IV)", page: currentPage, isFolder: true, volume: 2 });
+      currentPage++; // cover V2
+
+      // Volume 2 content
+      for (const folder of vol2Folders) {
+        tocEntries.push({ title: folder.title, page: currentPage, isFolder: true, volume: 2 });
+        currentPage++; // section separator
+        const docBlobs = folderDocsMap.get(folder.index) || [];
+        for (const { item, pageCount } of docBlobs) {
+          tocEntries.push({ title: item.title, page: currentPage, isFolder: false, volume: 2 });
+          currentPage += pageCount;
+        }
+      }
+
       const totalPages = currentPage - 1;
 
-      // ── TOC Pages ──
-      const tocPages: any[] = [];
-      let tocY = 842 - 100;
+      /* ── TOC Pages ── */
+      let tocY = 842 - 90;
       let currentTocPage = pdfDoc.addPage([595, 842]);
-      currentTocPage.drawText("ÍNDICE", { x: 50, y: 842 - 60, size: 18, font: fontBold, color: rgb(0, 0, 0) });
-      tocPages.push(currentTocPage);
+      currentTocPage.drawText("INDICE GENERAL", { x: 50, y: 842 - 55, size: 16, font: fontBold });
 
       for (const entry of tocEntries) {
-        if (tocY < 60) {
+        if (tocY < 55) {
           currentTocPage = pdfDoc.addPage([595, 842]);
-          tocPages.push(currentTocPage);
-          tocY = 842 - 60;
+          tocY = 842 - 55;
         }
-        const label = entry.isFolder ? `${entry.title}` : `    ${entry.title}`;
-        const pageLabel = `Pág. ${entry.page}`;
-        const labelWidth = (entry.isFolder ? fontBold : font).widthOfTextAtSize(label, entry.isFolder ? 11 : 9);
-        const pageWidth = font.widthOfTextAtSize(pageLabel, 9);
-        const dotsStart = 50 + labelWidth + 5;
-        const dotsEnd = 545 - pageWidth - 5;
+        const label = entry.isFolder ? entry.title : `    ${entry.title}`;
+        const pageLabel = `Pag. ${entry.page}`;
+        const entryFont = entry.isFolder ? fontBold : font;
+        const entrySize = entry.isFolder ? 10 : 9;
+        const labelWidth = entryFont.widthOfTextAtSize(label, entrySize);
+        const pageWidth = font.widthOfTextAtSize(pageLabel, 8);
+        const dotsStart = 50 + labelWidth + 4;
+        const dotsEnd = 545 - pageWidth - 4;
         const dotStr = ".".repeat(Math.max(0, Math.floor((dotsEnd - dotsStart) / 3)));
-        currentTocPage.drawText(label, { x: 50, y: tocY, size: entry.isFolder ? 11 : 9, font: entry.isFolder ? fontBold : font, color: rgb(0, 0, 0) });
-        if (dotStr.length > 0) currentTocPage.drawText(dotStr, { x: dotsStart, y: tocY, size: 8, font, color: rgb(0.7, 0.7, 0.7) });
-        currentTocPage.drawText(pageLabel, { x: 545 - pageWidth, y: tocY, size: 9, font, color: rgb(0.3, 0.3, 0.3) });
+        currentTocPage.drawText(label, { x: 50, y: tocY, size: entrySize, font: entryFont, color: rgb(0, 0, 0) });
+        if (dotStr.length > 0) currentTocPage.drawText(dotStr, { x: dotsStart, y: tocY, size: 7, font, color: rgb(0.7, 0.7, 0.7) });
+        currentTocPage.drawText(pageLabel, { x: 545 - pageWidth, y: tocY, size: 8, font, color: rgb(0.3, 0.3, 0.3) });
         tocY -= entry.isFolder ? 22 : 16;
       }
 
-      // ── Folder pages ──
-      for (const { folder, docBlobs } of folderDocsMap) {
+      /* ── Volume 1 Content ── */
+      for (const folder of vol1Folders) {
         // Separator page
         const sepPage = pdfDoc.addPage([595, 842]);
         const { width: sw, height: sh } = sepPage.getSize();
-        sepPage.drawText(`Seccion ${folder.index}`, { x: sw / 2 - 30, y: sh / 2 + 40, size: 28, font: fontBold, color: rgb(0.8, 0.8, 0.8) });
-        sepPage.drawText(folder.title.toUpperCase(), { x: 50, y: sh / 2 - 10, size: 16, font: fontBold, color: rgb(0, 0, 0) });
-        sepPage.drawText(`Sección ${folder.index} de 5`, { x: 50, y: sh / 2 - 35, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+        sepPage.drawText(folder.icon, { x: sw / 2 - 20, y: sh / 2 + 40, size: 28, font: fontBold, color: rgb(0.8, 0.8, 0.8) });
+        sepPage.drawText(folder.title.toUpperCase(), { x: 50, y: sh / 2 - 10, size: 14, font: fontBold });
+        sepPage.drawText("Volumen 1", { x: 50, y: sh / 2 - 35, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+
+        const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
+
+        // Text content page
+        const textItems = folderItems.filter(i => isTextSlot(i) && i.text_content?.trim());
+        if (textItems.length > 0) {
+          const textPage = pdfDoc.addPage([595, 842]);
+          let ty = 842 - 60;
+          textPage.drawText(folder.title, { x: 50, y: ty, size: 12, font: fontBold });
+          ty -= 30;
+          for (const ti of textItems) {
+            if (ty < 80) {
+              const np = pdfDoc.addPage([595, 842]);
+              ty = 842 - 60;
+            }
+            textPage.drawText(`${ti.title}:`, { x: 50, y: ty, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2) });
+            ty -= 14;
+            const lines = (ti.text_content || "").split("\n");
+            for (const line of lines) {
+              if (ty < 50) break;
+              textPage.drawText(line.slice(0, 90), { x: 60, y: ty, size: 9, font, color: rgb(0, 0, 0) });
+              ty -= 13;
+            }
+            ty -= 8;
+          }
+        }
 
         // Embedded documents
+        const docBlobs = folderDocsMap.get(folder.index) || [];
         for (const { item, blob } of docBlobs) {
           const ext = (item.file_name || "").toLowerCase();
           if (ext.endsWith(".pdf")) {
             try {
               const arrBuf = await blob.arrayBuffer();
               const srcDoc = await PDFDocument.load(arrBuf);
-              const indices = srcDoc.getPageIndices();
-              const copiedPages = await pdfDoc.copyPages(srcDoc, indices);
+              const copiedPages = await pdfDoc.copyPages(srcDoc, srcDoc.getPageIndices());
               copiedPages.forEach(p => pdfDoc.addPage(p));
             } catch {
               const errPage = pdfDoc.addPage([595, 842]);
@@ -547,33 +785,76 @@ const CFOModule = () => {
           } else if (ext.endsWith(".jpg") || ext.endsWith(".jpeg") || ext.endsWith(".png")) {
             try {
               const arrBuf = await blob.arrayBuffer();
-              const image = ext.endsWith(".png")
-                ? await pdfDoc.embedPng(arrBuf)
-                : await pdfDoc.embedJpg(arrBuf);
+              const image = ext.endsWith(".png") ? await pdfDoc.embedPng(arrBuf) : await pdfDoc.embedJpg(arrBuf);
               const imgPage = pdfDoc.addPage([595, 842]);
               const imgDims = image.scaleToFit(495, 700);
-              imgPage.drawImage(image, {
-                x: (595 - imgDims.width) / 2,
-                y: (842 - imgDims.height) / 2,
-                width: imgDims.width,
-                height: imgDims.height,
-              });
+              imgPage.drawImage(image, { x: (595 - imgDims.width) / 2, y: (842 - imgDims.height) / 2, width: imgDims.width, height: imgDims.height });
               imgPage.drawText(item.title, { x: 50, y: 820, size: 9, font, color: rgb(0.3, 0.3, 0.3) });
             } catch {
               const errPage = pdfDoc.addPage([595, 842]);
-              errPage.drawText(`Documento: ${item.title}`, { x: 50, y: 780, size: 12, font: fontBold });
-              errPage.drawText(`Imagen: ${item.file_name} (error al procesar)`, { x: 50, y: 760, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+              errPage.drawText(`Imagen: ${item.file_name} (error)`, { x: 50, y: 780, size: 10, font });
+            }
+          } else {
+            const docPage = pdfDoc.addPage([595, 842]);
+            docPage.drawText(`Documento: ${item.title}`, { x: 50, y: 780, size: 12, font: fontBold });
+            docPage.drawText(`Archivo: ${item.file_name} (formato no embebible)`, { x: 50, y: 760, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+          }
+        }
+      }
+
+      /* ── COVER: Volume 2 ── */
+      const coverV2 = pdfDoc.addPage([595, 842]);
+      coverV2.drawText("LIBRO DEL EDIFICIO", { x: 50, y: ch - 180, size: 28, font: fontBold });
+      coverV2.drawText("VOLUMEN 2 — ARCHIVO VIVO", { x: 50, y: ch - 215, size: 14, font: fontBold, color: rgb(0.3, 0.3, 0.3) });
+      coverV2.drawText("Parte IV — Registro Documental", { x: 50, y: ch - 240, size: 11, font, color: rgb(0.4, 0.4, 0.4) });
+      coverV2.drawLine({ start: { x: 50, y: ch - 260 }, end: { x: 545, y: ch - 260 }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
+      coverV2.drawText(projectName, { x: 50, y: ch - 300, size: 18, font: fontBold });
+      if (projectAddress) coverV2.drawText(projectAddress, { x: 50, y: ch - 325, size: 11, font, color: rgb(0.3, 0.3, 0.3) });
+      if (registroData.nrc) coverV2.drawText(`Ref. Catastral: ${registroData.nrc}`, { x: 50, y: ch - 350, size: 11, font, color: rgb(0.4, 0.4, 0.4) });
+      coverV2.drawText(`Fecha de emision: ${today}`, { x: 50, y: ch - 400, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+
+      /* ── Volume 2 Content ── */
+      for (const folder of vol2Folders) {
+        const sepPage = pdfDoc.addPage([595, 842]);
+        const { width: sw, height: sh } = sepPage.getSize();
+        sepPage.drawText(folder.sectionCode || folder.icon, { x: sw / 2 - 20, y: sh / 2 + 40, size: 32, font: fontBold, color: rgb(0.8, 0.8, 0.8) });
+        sepPage.drawText(folder.title.toUpperCase(), { x: 50, y: sh / 2 - 10, size: 14, font: fontBold });
+        sepPage.drawText("Volumen 2 — Archivo Vivo", { x: 50, y: sh / 2 - 35, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+
+        const docBlobs = folderDocsMap.get(folder.index) || [];
+        for (const { item, blob } of docBlobs) {
+          const ext = (item.file_name || "").toLowerCase();
+          if (ext.endsWith(".pdf")) {
+            try {
+              const arrBuf = await blob.arrayBuffer();
+              const srcDoc = await PDFDocument.load(arrBuf);
+              const copiedPages = await pdfDoc.copyPages(srcDoc, srcDoc.getPageIndices());
+              copiedPages.forEach(p => pdfDoc.addPage(p));
+            } catch {
+              const errPage = pdfDoc.addPage([595, 842]);
+              errPage.drawText(`Documento: ${item.title} (no embebible)`, { x: 50, y: 780, size: 12, font: fontBold });
+            }
+          } else if (ext.endsWith(".jpg") || ext.endsWith(".jpeg") || ext.endsWith(".png")) {
+            try {
+              const arrBuf = await blob.arrayBuffer();
+              const image = ext.endsWith(".png") ? await pdfDoc.embedPng(arrBuf) : await pdfDoc.embedJpg(arrBuf);
+              const imgPage = pdfDoc.addPage([595, 842]);
+              const imgDims = image.scaleToFit(495, 700);
+              imgPage.drawImage(image, { x: (595 - imgDims.width) / 2, y: (842 - imgDims.height) / 2, width: imgDims.width, height: imgDims.height });
+              imgPage.drawText(item.title, { x: 50, y: 820, size: 9, font, color: rgb(0.3, 0.3, 0.3) });
+            } catch {
+              const errPage = pdfDoc.addPage([595, 842]);
+              errPage.drawText(`Imagen: ${item.file_name} (error)`, { x: 50, y: 780, size: 10, font });
             }
           } else {
             const docPage = pdfDoc.addPage([595, 842]);
             docPage.drawText(`Documento: ${item.title}`, { x: 50, y: 780, size: 12, font: fontBold });
             docPage.drawText(`Archivo: ${item.file_name}`, { x: 50, y: 760, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
-            docPage.drawText("(Formato no embebible en PDF — consulte el archivo original)", { x: 50, y: 730, size: 9, font, color: rgb(0.6, 0.6, 0.6) });
           }
         }
       }
 
-      // Add footers to all pages
+      // Add footers
       const allPages = pdfDoc.getPages();
       const total = allPages.length;
       allPages.forEach((page, idx) => addFooter(page, idx + 1, total));
@@ -598,39 +879,15 @@ const CFOModule = () => {
     setExporting(false);
   };
 
-  const handleCreateSlot = async () => {
-    if (!projectId || !user || !newSlotTitle.trim()) return;
-    const folderIdx = parseInt(newSlotFolder);
-    const folderItems = items.filter(i => (i.folder_index || 1) === folderIdx);
-    const maxSort = folderItems.reduce((max, i) => Math.max(max, i.sort_order || 0), 0);
-    const maxItemNum = items.reduce((max, i) => Math.max(max, i.item_number || 0), 0);
-
-    const { error } = await supabase.from("cfo_items").insert({
-      project_id: projectId,
-      category: FOLDERS.find(f => f.index === folderIdx)?.title || "",
-      title: newSlotTitle.trim(),
-      sort_order: maxSort + 1,
-      item_number: maxItemNum + 1,
-      allowed_roles: [newSlotRole],
-      folder_index: folderIdx,
-      is_custom: true,
-      created_by_user: user.id,
-    });
-    if (error) { toast.error("Error al crear requerimiento"); return; }
-    toast.success("Nuevo requerimiento creado");
-    setNewSlotOpen(false); setNewSlotTitle(""); setNewSlotFolder("1"); setNewSlotRole("CON");
-    fetchItems();
-  };
-
   const toggleFolder = (idx: number) => {
     setOpenFolders(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
+  /* ── Stats ─────────────────────────────────────────── */
   const totalItems = items.length;
-  const completedItems = items.filter((i) => i.is_completed).length;
-  const validatedItems = items.filter((i) => i.validated_by_deo).length;
-  const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-  const allValidated = totalItems > 0 && validatedItems === totalItems;
+  const filledItems = items.filter(i => isSlotFilled(i)).length;
+  const validatedItems = items.filter(i => i.validated_by_deo).length;
+  const progress = totalItems > 0 ? Math.round((filledItems / totalItems) * 100) : 0;
 
   if (profileLoading || loading) {
     return (
@@ -649,203 +906,157 @@ const CFOModule = () => {
   return (
     <AppLayout>
       <div className="max-w-5xl mx-auto px-4 py-8">
+        {/* Header */}
         <div className="flex items-center gap-3 mb-2">
           <Button variant="ghost" size="icon" onClick={() => navigate(`/project/${projectId}`)}><ArrowLeft className="h-4 w-4" /></Button>
           <p className="text-xs font-display uppercase tracking-[0.2em] text-muted-foreground">CFO y Libro del Edificio</p>
         </div>
         <div className="flex items-end justify-between mb-4">
           <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tighter">CFO y Libro del Edificio</h1>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tighter">Libro del Edificio</h1>
             <p className="text-xs text-muted-foreground mt-1">Tu rol: <span className="font-semibold">{roleLabels[userRole || ""] || userRole || "—"}</span></p>
           </div>
           <div className="text-right">
             <p className="font-display text-2xl font-bold tracking-tighter text-success">{progress}%</p>
-            <p className="text-xs text-muted-foreground">{completedItems}/{totalItems} · {validatedItems} validados</p>
+            <p className="text-xs text-muted-foreground">{filledItems}/{totalItems} · {validatedItems} validados</p>
           </div>
         </div>
 
+        {/* Progress bar */}
         <div className="w-full h-2 bg-secondary rounded-full mb-4 overflow-hidden">
           <div className="h-full bg-success rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
         </div>
 
+        {/* Mandatory warning */}
+        {missingMandatory.length > 0 && (
+          <div className="flex items-start gap-2 p-3 mb-4 bg-destructive/5 border border-destructive/20 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-display uppercase tracking-wider text-destructive font-semibold">
+                {missingMandatory.length} documento(s) obligatorio(s) pendiente(s)
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {missingMandatory.map(m => m.title).join(" · ")}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {isAdmin && (
             <Button onClick={() => setNewSlotOpen(true)} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2">
-              <Plus className="h-4 w-4" /> Nuevo Requerimiento
+              <Plus className="h-4 w-4" /> Nuevo Slot
             </Button>
           )}
           {isAdmin && (
-            <Button data-tour="cfo-audit" onClick={handleAudit} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={auditing}>
+            <Button onClick={handleAudit} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={auditing}>
               <Shield className="h-4 w-4" /> {auditing ? "Escaneando..." : "Auditoría"}
             </Button>
           )}
-          <Button onClick={handleExportPDF} variant={allValidated ? "default" : "outline"} className="font-display text-xs uppercase tracking-wider gap-2" disabled={exporting || completedItems === 0}>
-            <BookOpen className="h-4 w-4" /> {exporting ? "Generando PDF..." : "Exportar Libro del Edificio"}
+          <Button
+            onClick={handleExportPDF}
+            variant={canCompile ? "default" : "outline"}
+            className="font-display text-xs uppercase tracking-wider gap-2"
+            disabled={exporting || !canCompile}
+          >
+            {!canCompile && <Lock className="h-3.5 w-3.5" />}
+            <BookOpen className="h-4 w-4" />
+            {exporting ? "Compilando..." : "Compilar Libro del Edificio"}
           </Button>
         </div>
 
-        {/* ── 5 LOE Folders ───────────────────────────────── */}
-        <div className="space-y-4">
-          {FOLDERS.map((folder) => {
-            const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
-            const folderCompleted = folderItems.filter(i => i.is_completed).length;
-            const folderValidated = folderItems.filter(i => i.validated_by_deo).length;
-            const isOpen = openFolders[folder.index] ?? true;
+        {/* ── VOLUMES ────────────────────────────────── */}
+        {[1, 2].map(vol => {
+          const volFolders = FOLDERS.filter(f => f.volume === vol);
+          const volItems = items.filter(i => (i.volume || 1) === vol);
+          const volFilled = volItems.filter(i => isSlotFilled(i)).length;
+          return (
+            <div key={vol} className="mb-8">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-px flex-1 bg-border" />
+                <h2 className="font-display text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                  Volumen {vol} — {vol === 1 ? "Cuerpo del Libro" : "Archivo Vivo"}
+                </h2>
+                <span className="text-[10px] text-muted-foreground">{volFilled}/{volItems.length}</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
 
-            return (
-              <Collapsible key={folder.index} open={isOpen} onOpenChange={() => toggleFolder(folder.index)}>
-                <CollapsibleTrigger asChild>
-                  <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg cursor-pointer hover:border-foreground/10 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{folder.icon}</span>
-                      <div>
-                        <h2 className="font-display text-sm font-semibold uppercase tracking-wider">{folder.title}</h2>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{folderItems.length} documentos</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-widest rounded ${folderCompleted === folderItems.length && folderItems.length > 0 ? "bg-success/10 text-success" : "bg-secondary text-muted-foreground"}`}>
-                        {folderCompleted}/{folderItems.length}
-                        {folderValidated > 0 && ` · ${folderValidated}✓`}
-                      </span>
-                      {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                    </div>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="border border-t-0 border-border rounded-b-lg bg-card/50 p-3 space-y-2">
-                    {folderItems.length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-4">Sin documentos en esta carpeta</p>
-                    )}
-                    {folderItems.map((item) => {
-                      const isCompleted = item.is_completed;
-                      const isValidated = item.validated_by_deo;
-                      const isRejected = !!item.rejection_reason && !isValidated;
-                      const canUpload_ = canUploadItem(item);
-                      const isPending = !isCompleted;
-                      const canManageUploaded = canManageUploadedItem(item);
-                      const isExpanded = expandedItem === item.id;
+              <div className="space-y-3">
+                {volFolders.map((folder) => {
+                  const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
+                  const folderFilled = folderItems.filter(i => isSlotFilled(i)).length;
+                  const folderValidated = folderItems.filter(i => i.validated_by_deo).length;
+                  const isOpen = openFolders[folder.index] ?? true;
+                  const hasMandatoryPending = folderItems.some(i => i.is_mandatory && !isSlotFilled(i));
 
-                      return (
-                        <div key={item.id}>
-                          <div
-                            className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded border transition-all cursor-pointer gap-2 ${
-                              isRejected ? "border-destructive/50 bg-destructive/5" :
-                              isValidated ? "border-success/50 bg-success/10" :
-                              isCompleted ? "border-success/30 bg-success/5" :
-                              item.claimed_at ? "border-destructive/30 bg-destructive/5" : "border-border hover:border-foreground/10 hover:shadow-md"
-                            }`}
-                            onClick={() => isCompleted && item.file_url && togglePreview(item)}
-                          >
-                            <div className="flex items-start gap-3 flex-1 min-w-0">
-                              {isRejected ? <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" /> :
-                               isValidated ? <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" /> :
-                               isCompleted ? <CheckCircle2 className="h-5 w-5 text-success/60 shrink-0 mt-0.5" /> :
-                               <Circle className="h-5 w-5 text-muted-foreground/30 shrink-0 mt-0.5" />}
-                              <div className="min-w-0">
-                                <p className={`text-sm ${isRejected ? "text-destructive" : isCompleted ? "text-success" : ""}`}>
-                                  {item.title}
-                                </p>
-                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                  {item.file_name && <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><FileText className="h-3 w-3" /> {item.file_name}</span>}
-                                  {item.claimed_at && !isCompleted && <span className="text-[10px] text-destructive font-display uppercase tracking-wider">Reclamado</span>}
-                                  {isValidated && <span className="text-[10px] text-success font-display uppercase tracking-wider">✓ Validado</span>}
-                                  {isRejected && <span className="text-[10px] text-destructive font-display uppercase tracking-wider">✗ Rechazado</span>}
-                                </div>
-                                {isRejected && item.rejection_reason && (
-                                  <p className="text-[10px] text-destructive mt-0.5">Motivo: {item.rejection_reason}</p>
-                                )}
-                                <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                                  Responsable: {(item.allowed_roles || []).map((r: string) => roleLabels[r] || r).join(" / ")}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0 flex-wrap pl-8 sm:pl-0" onClick={e => e.stopPropagation()}>
-                              {isPending && canUpload_ && (
-                                <label className="cursor-pointer">
-                                  <input type="file" className="hidden" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => {
-                                    const files = e.target.files;
-                                    if (files) {
-                                      Array.from(files).forEach(f => void handleFileUpload(item.id, f));
-                                    }
-                                    e.currentTarget.value = "";
-                                  }} />
-                                  <span className={`flex items-center gap-1 px-2 py-1 text-[10px] font-display uppercase tracking-widest rounded border border-border hover:border-foreground/20 transition-colors cursor-pointer ${uploadingId === item.id ? "opacity-50" : ""}`}>
-                                    <Upload className="h-3 w-3" /> {uploadingId === item.id ? "..." : "Subir"}
-                                  </span>
-                                </label>
-                              )}
-                              {isAdmin && isCompleted && !isValidated && (
-                                <>
-                                  <Button size="sm" variant="outline" onClick={() => handleValidate(item.id)} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7">
-                                    <Shield className="h-3 w-3" /> Validar
-                                  </Button>
-                                  <Button size="sm" variant="ghost" onClick={() => { setRejectDialog({ open: true, item }); setRejectReason(""); }} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-destructive hover:text-destructive">
-                                    <XCircle className="h-3 w-3" /> Rechazar
-                                  </Button>
-                                </>
-                              )}
-                              {isAdmin && isPending && (
-                                <Button data-tour="cfo-reclaim" size="sm" variant="ghost" onClick={() => setClaimDialog({ open: true, item })} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-destructive hover:text-destructive">
-                                  <Bell className="h-3 w-3" /> Reclamar
-                                </Button>
-                              )}
-                              {isAdmin && (
-                                <>
-                                  <Button size="sm" variant="ghost" onClick={() => { setEditSlotItem(item); setEditSlotTitle(item.title); setEditSlotOpen(true); }} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-muted-foreground hover:text-foreground">
-                                    <Edit2 className="h-3 w-3" />
-                                  </Button>
-                                  <Button size="sm" variant="ghost" onClick={() => handleDeleteSlot(item)} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-muted-foreground hover:text-destructive">
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </>
-                              )}
-                              {isCompleted && item.file_url && (
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                  {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                                </Button>
-                              )}
+                  return (
+                    <Collapsible key={folder.index} open={isOpen} onOpenChange={() => toggleFolder(folder.index)}>
+                      <CollapsibleTrigger asChild>
+                        <div className={`flex items-center justify-between p-3 bg-card border rounded-lg cursor-pointer hover:border-foreground/10 transition-colors ${hasMandatoryPending ? "border-destructive/30" : "border-border"}`}>
+                          <div className="flex items-center gap-3">
+                            <span className="font-display text-xs font-bold text-muted-foreground w-6 text-center">{folder.icon}</span>
+                            <div>
+                              <h3 className="font-display text-xs font-semibold uppercase tracking-wider">{folder.title}</h3>
+                              <p className="text-[10px] text-muted-foreground">{folderItems.length} elementos</p>
                             </div>
                           </div>
-
-                          {isExpanded && isCompleted && item.file_url && (
-                            <div className="border border-t-0 border-border rounded-b-lg p-4 bg-background animate-in slide-in-from-top-2 duration-200">
-                              <div className="flex flex-wrap items-center gap-2 mb-3">
-                                <Button size="sm" variant="outline" onClick={() => handleDownloadItem(item)} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7">
-                                  <Download className="h-3 w-3" /> Descargar
-                                </Button>
-                                {canManageUploaded && (
-                                  <>
-                                    <label className="cursor-pointer">
-                                      <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleReplaceFile(item, f); e.currentTarget.value = ""; }} />
-                                      <span className="flex items-center gap-1 px-2 py-1 text-[10px] font-display uppercase tracking-widest rounded border border-border hover:border-foreground/20 transition-colors cursor-pointer">
-                                        <RefreshCw className="h-3 w-3" /> Sustituir
-                                      </span>
-                                    </label>
-                                    <Button size="sm" variant="ghost" onClick={() => void handleDeleteFile(item)} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-destructive hover:text-destructive">
-                                      <Trash2 className="h-3 w-3" /> Eliminar
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                              {previewUrls[item.id] ? (
-                                <DocumentPreview url={previewUrls[item.id]} fileName={item.file_name || ""} />
-                              ) : (
-                                <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Cargando previsualización...
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {hasMandatoryPending && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+                            <span className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-widest rounded ${folderFilled === folderItems.length && folderItems.length > 0 ? "bg-success/10 text-success" : "bg-secondary text-muted-foreground"}`}>
+                              {folderFilled}/{folderItems.length}
+                              {folderValidated > 0 && ` · ${folderValidated}✓`}
+                            </span>
+                            {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
-        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="border border-t-0 border-border rounded-b-lg bg-card/50 p-3 space-y-2">
+                          {folderItems.length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-4">Sin elementos</p>
+                          )}
+                          {folderItems.map((item) => (
+                            <SlotRow
+                              key={item.id}
+                              item={item}
+                              isAdmin={isAdmin}
+                              userRole={userRole}
+                              user={user}
+                              expandedItem={expandedItem}
+                              previewUrls={previewUrls}
+                              uploadingId={uploadingId}
+                              isSlotFilled={isSlotFilled}
+                              isTextSlot={isTextSlot}
+                              isVisualSlot={isVisualSlot}
+                              canUploadItem={canUploadItem}
+                              canManageUploadedItem={canManageUploadedItem}
+                              canEditTextSlot={canEditTextSlot}
+                              togglePreview={togglePreview}
+                              handleFileUpload={handleFileUpload}
+                              handleDownloadItem={handleDownloadItem}
+                              handleReplaceFile={handleReplaceFile}
+                              handleDeleteFile={handleDeleteFile}
+                              handleDeleteSlot={handleDeleteSlot}
+                              handleValidate={handleValidate}
+                              handleSaveTextContent={handleSaveTextContent}
+                              setRejectDialog={setRejectDialog}
+                              setRejectReason={setRejectReason}
+                              setClaimDialog={setClaimDialog}
+                              setEditSlotItem={setEditSlotItem}
+                              setEditSlotTitle={setEditSlotTitle}
+                              setEditSlotOpen={setEditSlotOpen}
+                            />
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
 
         <p className="text-[10px] text-muted-foreground/50 text-center mt-8 font-display uppercase tracking-wider">
           Su actividad y conformidad están siendo registradas legalmente
@@ -857,26 +1068,38 @@ const CFOModule = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display">Nuevo Requerimiento</DialogTitle>
-            <DialogDescription>Crea un slot personalizado para un documento adicional.</DialogDescription>
+            <DialogDescription>Crea un slot personalizado para el Libro del Edificio.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Nombre del documento *</Label>
-              <Input value={newSlotTitle} onChange={e => setNewSlotTitle(e.target.value)} placeholder="Ej: Certificado de puesta a tierra" />
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Nombre *</Label>
+              <Input value={newSlotTitle} onChange={e => setNewSlotTitle(e.target.value)} placeholder="Ej: Certificado de Desinsectación" />
             </div>
             <div className="space-y-2">
-              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Carpeta de destino</Label>
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Sección de destino</Label>
               <Select value={newSlotFolder} onValueChange={setNewSlotFolder}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {FOLDERS.map(f => (
-                    <SelectItem key={f.index} value={String(f.index)}>{f.icon} {f.title}</SelectItem>
+                    <SelectItem key={f.index} value={String(f.index)}>
+                      Vol.{f.volume} — {f.icon}. {f.title}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Rol responsable de la carga</Label>
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Tipo de slot</Label>
+              <Select value={newSlotType} onValueChange={v => setNewSlotType(v as "document" | "text")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="document">Documento (carga de archivo)</SelectItem>
+                  <SelectItem value="text">Texto (campo de texto editable)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Responsable</Label>
               <Select value={newSlotRole} onValueChange={v => setNewSlotRole(v as AppRole)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -886,10 +1109,16 @@ const CFOModule = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" checked={newSlotMandatory} onChange={e => setNewSlotMandatory(e.target.checked)} id="mandatory-check" className="rounded" />
+              <Label htmlFor="mandatory-check" className="font-display text-xs uppercase tracking-wider text-muted-foreground cursor-pointer">
+                Obligatorio para compilación
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewSlotOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateSlot} disabled={!newSlotTitle.trim()}>Crear Requerimiento</Button>
+            <Button onClick={handleCreateSlot} disabled={!newSlotTitle.trim()}>Crear</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -916,7 +1145,7 @@ const CFOModule = () => {
       <AlertDialog open={claimDialog.open} onOpenChange={(o) => setClaimDialog({ open: o, item: claimDialog.item })}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-display">⚠️ Enviar Reclamación Legal</AlertDialogTitle>
+            <AlertDialogTitle className="font-display">Enviar Reclamación</AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p>Al leer esta notificación se registrará su acuse de recibo legal. ¿Desea continuar?</p>
               {claimDialog.item && (
@@ -932,7 +1161,7 @@ const CFOModule = () => {
           <AlertDialogFooter>
             <AlertDialogCancel className="font-display text-xs uppercase tracking-wider">Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => claimDialog.item && handleClaim(claimDialog.item)} className="font-display text-xs uppercase tracking-wider bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Confirmar Reclamación
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -942,14 +1171,12 @@ const CFOModule = () => {
       <AlertDialog open={rejectDialog.open} onOpenChange={(o) => { if (!o) { setRejectDialog({ open: false, item: null }); setRejectReason(""); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-display">❌ Rechazar Documento</AlertDialogTitle>
-            <AlertDialogDescription>
-              Indica el motivo del rechazo. El agente responsable recibirá una notificación.
-            </AlertDialogDescription>
+            <AlertDialogTitle className="font-display">Rechazar Documento</AlertDialogTitle>
+            <AlertDialogDescription>Indica el motivo del rechazo.</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-2 py-2">
-            <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Motivo de rechazo *</Label>
-            <Textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Indique el motivo del rechazo..." rows={3} />
+            <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Motivo *</Label>
+            <Textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Motivo del rechazo..." rows={3} />
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -960,6 +1187,226 @@ const CFOModule = () => {
         </AlertDialogContent>
       </AlertDialog>
     </AppLayout>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   SLOT ROW COMPONENT
+   ═══════════════════════════════════════════════════════════ */
+interface SlotRowProps {
+  item: any;
+  isAdmin: boolean;
+  userRole: AppRole | undefined;
+  user: any;
+  expandedItem: string | null;
+  previewUrls: Record<string, string>;
+  uploadingId: string | null;
+  isSlotFilled: (item: any) => boolean;
+  isTextSlot: (item: any) => boolean;
+  isVisualSlot: (item: any) => boolean;
+  canUploadItem: (item: any) => boolean;
+  canManageUploadedItem: (item: any) => boolean;
+  canEditTextSlot: (item: any) => boolean;
+  togglePreview: (item: any) => void;
+  handleFileUpload: (itemId: string, file: File) => void;
+  handleDownloadItem: (item: any) => void;
+  handleReplaceFile: (item: any, file: File) => void;
+  handleDeleteFile: (item: any) => void;
+  handleDeleteSlot: (item: any) => void;
+  handleValidate: (itemId: string) => void;
+  handleSaveTextContent: (itemId: string, text: string) => void;
+  setRejectDialog: (v: { open: boolean; item: any | null }) => void;
+  setRejectReason: (v: string) => void;
+  setClaimDialog: (v: { open: boolean; item: any | null }) => void;
+  setEditSlotItem: (v: any) => void;
+  setEditSlotTitle: (v: string) => void;
+  setEditSlotOpen: (v: boolean) => void;
+}
+
+const SlotRow = ({
+  item, isAdmin, userRole, user, expandedItem, previewUrls, uploadingId,
+  isSlotFilled: checkFilled, isTextSlot: checkText, isVisualSlot: checkVisual,
+  canUploadItem: canUpload, canManageUploadedItem: canManage, canEditTextSlot: canEditText,
+  togglePreview, handleFileUpload, handleDownloadItem, handleReplaceFile, handleDeleteFile,
+  handleDeleteSlot, handleValidate, handleSaveTextContent,
+  setRejectDialog, setRejectReason, setClaimDialog, setEditSlotItem, setEditSlotTitle, setEditSlotOpen,
+}: SlotRowProps) => {
+  const [localText, setLocalText] = useState(item.text_content || "");
+  const [textDirty, setTextDirty] = useState(false);
+
+  useEffect(() => { setLocalText(item.text_content || ""); setTextDirty(false); }, [item.text_content]);
+
+  const filled = checkFilled(item);
+  const isText = checkText(item);
+  const isVisual = checkVisual(item);
+  const isDoc = !isText && !isVisual;
+  const isCompleted = item.is_completed;
+  const isValidated = item.validated_by_deo;
+  const isRejected = !!item.rejection_reason && !isValidated;
+  const isPending = !filled;
+  const isExpanded = expandedItem === item.id;
+  const canUp = canUpload(item);
+  const canMan = canManage(item);
+  const isMandatory = item.is_mandatory;
+
+  return (
+    <div>
+      <div
+        className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded border transition-all gap-2 ${
+          isRejected ? "border-destructive/50 bg-destructive/5" :
+          isValidated ? "border-success/50 bg-success/10" :
+          filled ? "border-success/30 bg-success/5" :
+          item.claimed_at ? "border-destructive/30 bg-destructive/5" : "border-border hover:border-foreground/10"
+        } ${(isDoc || isVisual) && isCompleted && item.file_url ? "cursor-pointer" : ""}`}
+        onClick={() => {
+          if ((isDoc || isVisual) && isCompleted && item.file_url) togglePreview(item);
+        }}
+      >
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          {isRejected ? <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" /> :
+           filled ? <CheckCircle2 className={`h-5 w-5 ${isValidated ? "text-success" : "text-success/60"} shrink-0 mt-0.5`} /> :
+           <Circle className="h-5 w-5 text-muted-foreground/30 shrink-0 mt-0.5" />}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className={`text-sm ${isRejected ? "text-destructive" : filled ? "text-success" : ""}`}>
+                {item.title}
+              </p>
+              {isMandatory && <span className="text-[9px] px-1.5 py-0.5 bg-destructive/10 text-destructive rounded font-display uppercase tracking-wider">Obligatorio</span>}
+              {isText && <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-display uppercase tracking-wider">Texto</span>}
+              {isVisual && <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-display uppercase tracking-wider">Visual</span>}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {item.file_name && <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><FileText className="h-3 w-3" />{item.file_name}</span>}
+              {item.claimed_at && !filled && <span className="text-[10px] text-destructive font-display uppercase tracking-wider">Reclamado</span>}
+              {isValidated && <span className="text-[10px] text-success font-display uppercase tracking-wider">Validado</span>}
+              {isRejected && <span className="text-[10px] text-destructive font-display uppercase tracking-wider">Rechazado</span>}
+            </div>
+            {isRejected && item.rejection_reason && (
+              <p className="text-[10px] text-destructive mt-0.5">Motivo: {item.rejection_reason}</p>
+            )}
+            <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+              Resp: {(item.allowed_roles || []).map((r: string) => roleLabels[r] || r).join(" / ")}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0 flex-wrap pl-8 sm:pl-0" onClick={e => e.stopPropagation()}>
+          {/* Text slot inline editing */}
+          {isText && canEditText(item) && (
+            <div className="w-full sm:w-auto flex gap-1">
+              {textDirty && (
+                <Button size="sm" variant="outline" onClick={() => { handleSaveTextContent(item.id, localText); setTextDirty(false); }} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7">
+                  Guardar
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Document/Visual upload */}
+          {(isDoc || isVisual) && isPending && canUp && (
+            <label className="cursor-pointer">
+              <input type="file" className="hidden" accept={isVisual ? ".jpg,.jpeg,.png,.pdf" : ".pdf,.doc,.docx,.jpg,.jpeg,.png"} onChange={(e) => {
+                const files = e.target.files;
+                if (files) Array.from(files).forEach(f => void handleFileUpload(item.id, f));
+                e.currentTarget.value = "";
+              }} />
+              <span className={`flex items-center gap-1 px-2 py-1 text-[10px] font-display uppercase tracking-widest rounded border border-border hover:border-foreground/20 transition-colors cursor-pointer ${uploadingId === item.id ? "opacity-50" : ""}`}>
+                <Upload className="h-3 w-3" /> {uploadingId === item.id ? "..." : "Subir"}
+              </span>
+            </label>
+          )}
+
+          {/* Admin validation */}
+          {isAdmin && (isDoc || isVisual) && isCompleted && !isValidated && (
+            <>
+              <Button size="sm" variant="outline" onClick={() => handleValidate(item.id)} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7">
+                <Shield className="h-3 w-3" /> Validar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => { setRejectDialog({ open: true, item }); setRejectReason(""); }} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-destructive hover:text-destructive">
+                <XCircle className="h-3 w-3" />
+              </Button>
+            </>
+          )}
+
+          {/* Claim */}
+          {isAdmin && isPending && !isText && (
+            <Button size="sm" variant="ghost" onClick={() => setClaimDialog({ open: true, item })} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-destructive hover:text-destructive">
+              <Bell className="h-3 w-3" />
+            </Button>
+          )}
+
+          {/* Admin edit/delete */}
+          {isAdmin && (
+            <>
+              <Button size="sm" variant="ghost" onClick={() => { setEditSlotItem(item); setEditSlotTitle(item.title); setEditSlotOpen(true); }} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                <Edit2 className="h-3 w-3" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => handleDeleteSlot(item)} className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive">
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </>
+          )}
+
+          {/* Expand */}
+          {(isDoc || isVisual) && isCompleted && item.file_url && (
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
+              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Text slot inline editor */}
+      {isText && canEditText(item) && (
+        <div className="border border-t-0 border-border rounded-b-lg p-3 bg-background">
+          <Textarea
+            value={localText}
+            onChange={e => { setLocalText(e.target.value); setTextDirty(true); }}
+            placeholder={`Introduce ${item.title}...`}
+            rows={item.title.includes("Ficha") || item.title.includes("Protocolo") || item.title.includes("Memoria") ? 6 : 2}
+            className="bg-secondary/30 text-sm"
+          />
+          {textDirty && (
+            <div className="flex justify-end mt-2">
+              <Button size="sm" onClick={() => { handleSaveTextContent(item.id, localText); setTextDirty(false); }} className="text-[10px] font-display uppercase tracking-widest">
+                Guardar
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* File preview */}
+      {isExpanded && (isDoc || isVisual) && isCompleted && item.file_url && (
+        <div className="border border-t-0 border-border rounded-b-lg p-4 bg-background animate-in slide-in-from-top-2 duration-200">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <Button size="sm" variant="outline" onClick={() => handleDownloadItem(item)} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7">
+              <Download className="h-3 w-3" /> Descargar
+            </Button>
+            {canMan && (
+              <>
+                <label className="cursor-pointer">
+                  <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleReplaceFile(item, f); e.currentTarget.value = ""; }} />
+                  <span className="flex items-center gap-1 px-2 py-1 text-[10px] font-display uppercase tracking-widest rounded border border-border hover:border-foreground/20 transition-colors cursor-pointer">
+                    <RefreshCw className="h-3 w-3" /> Sustituir
+                  </span>
+                </label>
+                <Button size="sm" variant="ghost" onClick={() => void handleDeleteFile(item)} className="text-[10px] font-display uppercase tracking-widest gap-1 h-7 text-destructive hover:text-destructive">
+                  <Trash2 className="h-3 w-3" /> Eliminar
+                </Button>
+              </>
+            )}
+          </div>
+          {previewUrls[item.id] ? (
+            <DocumentPreview url={previewUrls[item.id]} fileName={item.file_name || ""} />
+          ) : (
+            <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" /> Cargando...
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 
