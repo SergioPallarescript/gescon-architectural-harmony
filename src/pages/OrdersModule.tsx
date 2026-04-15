@@ -27,7 +27,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { notifyProjectMembers, notifyUser } from "@/lib/notifications";
+import { notifyProjectMembers, notifyUser, pushNewOrder } from "@/lib/notifications";
+import ShareButton from "@/components/ShareButton";
 import {
   ArrowLeft, Plus, BookOpen, AlertTriangle, Mic, MicOff, Camera, Image, Paperclip, X, Download, Lock, ShieldCheck, FileSignature, PenLine, Sparkles,
 } from "lucide-react";
@@ -806,6 +807,23 @@ const OrdersModule = () => {
                         >
                           <PenLine className="h-3.5 w-3.5" /> Firmar como destinatario
                         </Button>
+                      )}
+                      {project && (
+                        <ShareButton
+                          size="sm"
+                          data={{
+                            module: "order",
+                            projectId: projectId!,
+                            projectName: project.name,
+                            itemId: order.id,
+                            meta: {
+                              emitidaPor: (order as any).escrita_por || "",
+                              fecha: new Date(order.created_at).toLocaleDateString("es-ES"),
+                              asunto: (order as any).asunto || "",
+                            },
+                          }}
+                          className="mt-2"
+                        />
                       )}
                     </div>
                   </div>

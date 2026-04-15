@@ -23,7 +23,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { notifyProjectMembers } from "@/lib/notifications";
+import { notifyProjectMembers, pushCostSubmission } from "@/lib/notifications";
+import ShareButton from "@/components/ShareButton";
 import {
   ArrowLeft, Plus, DollarSign, CheckCircle2, XCircle, Download, ExternalLink,
   Pencil, Trash2, Loader2, FileSignature, Upload, FileText, ZoomIn, ZoomOut, RotateCw,
@@ -77,6 +78,8 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 
 const CostsModule = () => {
   const { id: projectId } = useParams<{ id: string }>();
+  const [searchParams] = [new URLSearchParams(window.location.search)];
+  const deepLinkItem = searchParams.get("item");
   const { user } = useAuth();
   const { isDO, isDEM, isCON, isPRO, projectRole } = useProjectRole(projectId);
   const navigate = useNavigate();
@@ -136,6 +139,17 @@ const CostsModule = () => {
   }, [projectId]);
 
   useEffect(() => { fetchClaims(); }, [fetchClaims]);
+
+  // Deep link: auto-select item from URL
+  useEffect(() => {
+    if (!deepLinkItem || claims.length === 0) return;
+    if (deepLinkItem === "latest") {
+      setSelectedClaim(claims[0]);
+    } else {
+      const found = claims.find(c => c.id === deepLinkItem);
+      if (found) setSelectedClaim(found);
+    }
+  }, [deepLinkItem, claims]);
 
   /* ───── Partida computed values ───── */
   const partidaMedicion = useMemo(() => {
@@ -671,6 +685,20 @@ const CostsModule = () => {
                           </span>
                         </div>
                         <div className="flex flex-col gap-1 shrink-0">
+                          <ShareButton
+                            data={{
+                              module: "cost",
+                              projectId: projectId!,
+                              projectName: "",
+                              itemId: claim.id,
+                              meta: {
+                                docType: DOC_TYPE_LABELS[dt] || dt,
+                                emisor: "",
+                                estado: st.label,
+                                importe: parseFloat(claim.amount).toLocaleString("es-ES", { minimumFractionDigits: 2 }),
+                              },
+                            }}
+                          />
                           {editable && (
                             <>
                               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={e => { e.stopPropagation(); setEditClaim(claim); setEditData({ title: claim.title, description: claim.description || "", amount: String(claim.amount) }); }}>
