@@ -156,6 +156,17 @@ const SignatureDocuments = () => {
     }
   }, [documents.length]);
 
+  // Deep link: auto-select item from URL
+  useEffect(() => {
+    if (!deepLinkItem || documents.length === 0) return;
+    if (deepLinkItem === "latest") {
+      setSelectedDocument(documents[0]);
+    } else {
+      const found = documents.find(d => d.id === deepLinkItem);
+      if (found) setSelectedDocument(found);
+    }
+  }, [deepLinkItem, documents]);
+
   const renderPdf = useCallback(async (url: string) => {
     try {
       const loadingTask = pdfjsLib.getDocument(url);
