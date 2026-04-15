@@ -311,16 +311,16 @@ const SignatureDocuments = () => {
         details: { title: title.trim(), recipients: validRecipients, file_name: file.name, is_info_only: isInfoOnly },
       });
 
-      // Notify all recipients
+      // Notify all recipients with deep link
+      const senderName = user.user_metadata?.full_name || user.email || "Un agente";
       for (const rid of validRecipients) {
-        await notifyUser({
-          userId: rid,
+        await pushSignatureRequest({
           projectId: projectId!,
-          title: isInfoOnly ? "📄 Nuevo documento de registro" : "Firma pendiente",
-          message: isInfoOnly
-            ? `Has recibido un nuevo documento de registro en tu carpeta: "${title.trim()}"`
-            : `Tienes un nuevo documento para firmar: "${title.trim()}"`,
-          type: isInfoOnly ? "info" : "signature",
+          recipientId: rid,
+          senderName,
+          docName: title.trim(),
+          isInfoOnly,
+          docId: insertedDoc.id,
         });
       }
 
