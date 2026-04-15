@@ -720,6 +720,18 @@ const SignatureDocuments = () => {
                             )}
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
+                            <ShareButton
+                              data={{
+                                module: "signature",
+                                projectId: projectId!,
+                                projectName: "",
+                                itemId: doc.id,
+                                meta: {
+                                  docName: doc.original_file_name,
+                                  estado: isInfoDoc ? "Solo Lectura" : doc.status === "signed" ? "Firmado" : "Firma Requerida",
+                                },
+                              }}
+                            />
                             {canModify && (
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setReplaceTarget(doc); }}>
                                 <RefreshCw className="h-3.5 w-3.5" />

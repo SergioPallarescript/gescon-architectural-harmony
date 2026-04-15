@@ -672,6 +672,20 @@ const CostsModule = () => {
                           </span>
                         </div>
                         <div className="flex flex-col gap-1 shrink-0">
+                          <ShareButton
+                            data={{
+                              module: "cost",
+                              projectId: projectId!,
+                              projectName: "",
+                              itemId: claim.id,
+                              meta: {
+                                docType: DOC_TYPE_LABELS[dt] || dt,
+                                emisor: "",
+                                estado: st.label,
+                                importe: parseFloat(claim.amount).toLocaleString("es-ES", { minimumFractionDigits: 2 }),
+                              },
+                            }}
+                          />
                           {editable && (
                             <>
                               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={e => { e.stopPropagation(); setEditClaim(claim); setEditData({ title: claim.title, description: claim.description || "", amount: String(claim.amount) }); }}>

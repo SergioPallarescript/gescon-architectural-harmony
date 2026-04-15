@@ -425,6 +425,15 @@ const PlansModule = () => {
                     </button>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="text-xs text-muted-foreground font-display mr-2">v{plan.current_version}</span>
+                      <ShareButton
+                        data={{
+                          module: "plan",
+                          projectId: projectId!,
+                          projectName: "",
+                          itemId: plan.id,
+                          meta: { planName: plan.name, version: String(plan.current_version) },
+                        }}
+                      />
                       {isAdmin && (
                         <>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {
