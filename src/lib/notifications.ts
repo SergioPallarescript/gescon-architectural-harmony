@@ -31,14 +31,12 @@ export async function notifyProjectMembers({
   type?: string;
   url?: string;
 }) {
-  // Get all accepted members
   const { data: members } = await supabase
     .from("project_members")
     .select("user_id")
     .eq("project_id", projectId)
     .eq("status", "accepted");
 
-  // Get project creator
   const { data: project } = await supabase
     .from("projects")
     .select("created_by")
@@ -66,7 +64,6 @@ export async function notifyProjectMembers({
 
   await supabase.from("notifications").insert(notifications);
 
-  // Also send push notifications
   const pushUrl = url || `/project/${projectId}`;
   triggerPush(uidArray, title, message, pushUrl);
 }
@@ -80,12 +77,14 @@ export async function notifyUser({
   title,
   message,
   type = "info",
+  url,
 }: {
   userId: string;
   projectId: string;
   title: string;
   message: string;
   type?: string;
+  url?: string;
 }) {
   await supabase.from("notifications").insert({
     user_id: userId,
@@ -95,6 +94,110 @@ export async function notifyUser({
     type,
   });
 
-  // Also send push
-  triggerPush([userId], title, message, `/project/${projectId}`);
+  const pushUrl = url || `/project/${projectId}`;
+  triggerPush([userId], title, message, pushUrl);
+}
+
+/* ───── Module-specific push helpers ───── */
+
+export async function pushNewOrder({
+  projectId,
+  actorId,
+  actorName,
+  orderNumber,
+  asunto,
+}: {
+  projectId: string;
+  actorId: string;
+  actorName: string;
+  orderNumber: number;
+  asunto?: string;
+}) {
+  const title = `📝 Nueva Orden de Dirección #${orderNumber}`;
+  const message = `${actorName} ha registrado una instrucción técnica en el Libro de Órdenes.${asunto ? ` Asunto: ${asunto}` : ""}`;
+  await notifyProjectMembers({
+    projectId,
+    actorId,
+    title,
+    message,
+    type: "order",
+    url: `/project/${projectId}/orders?item=latest`,
+  });
+}
+
+export async function pushNewPlan({
+  projectId,
+  actorId,
+  planName,
+  version,
+}: {
+  projectId: string;
+  actorId: string;
+  planName: string;
+  version: number;
+}) {
+  const title = "📐 Revisión de Plano Válido";
+  const message = `Se requiere tu conformidad para la Versión ${version} de ${planName}.`;
+  await notifyProjectMembers({
+    projectId,
+    actorId,
+    title,
+    message,
+    type: "plan",
+    url: `/project/${projectId}/plans?item=latest`,
+  });
+}
+
+export async function pushCostSubmission({
+  projectId,
+  actorId,
+  actorName,
+  docType,
+  amount,
+}: {
+  projectId: string;
+  actorId: string;
+  actorName: string;
+  docType: string;
+  amount: number;
+}) {
+  const title = "💸 Validación Económica";
+  const message = `${actorName} ha enviado una ${docType} para su firma. Importe: ${amount.toLocaleString("es-ES", { minimumFractionDigits: 2 })} €`;
+  await notifyProjectMembers({
+    projectId,
+    actorId,
+    title,
+    message,
+    type: "cost",
+    url: `/project/${projectId}/costs?item=latest`,
+  });
+}
+
+export async function pushSignatureRequest({
+  projectId,
+  recipientId,
+  senderName,
+  docName,
+  isInfoOnly,
+  docId,
+}: {
+  projectId: string;
+  recipientId: string;
+  senderName: string;
+  docName: string;
+  isInfoOnly: boolean;
+  docId: string;
+}) {
+  const title = isInfoOnly ? "📂 Archivo Recibido" : "✍️ Firma Pendiente";
+  const message = isInfoOnly
+    ? `${senderName} ha compartido un documento contigo en tu archivo.`
+    : `Has recibido un documento que requiere tu firma electrónica: ${docName}`;
+  await notifyUser({
+    userId: recipientId,
+    projectId,
+    title,
+    message,
+    type: "signature",
+    url: `/project/${projectId}/signatures?item=${docId}`,
+  });
 }
