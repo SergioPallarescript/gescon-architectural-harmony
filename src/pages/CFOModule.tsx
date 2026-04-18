@@ -1228,6 +1228,8 @@ const CFOModule = () => {
    ═══════════════════════════════════════════════════════════ */
 interface SlotRowProps {
   item: any;
+  projectId: string;
+  filesCount: number;
   isAdmin: boolean;
   userRole: AppRole | undefined;
   user: any;
