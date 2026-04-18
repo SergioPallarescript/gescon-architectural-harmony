@@ -1051,6 +1051,8 @@ const CFOModule = () => {
                             <SlotRow
                               key={item.id}
                               item={item}
+                              projectId={projectId!}
+                              filesCount={(filesByItem[item.id] || []).length}
                               isAdmin={isAdmin}
                               userRole={userRole}
                               user={user}
