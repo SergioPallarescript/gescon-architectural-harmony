@@ -18,6 +18,7 @@ import {
   Plus, Edit2, BookOpen, Lock, AlertTriangle,
 } from "lucide-react";
 import DocumentPreview from "@/components/DocumentPreview";
+import MultiFileSlotManager, { type CfoFile } from "@/components/MultiFileSlotManager";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -138,6 +139,7 @@ const CFOModule = () => {
   const navigate = useNavigate();
 
   const [items, setItems] = useState<any[]>([]);
+  const [filesByItem, setFilesByItem] = useState<Record<string, CfoFile[]>>({});
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -269,7 +271,22 @@ const CFOModule = () => {
       .order("sort_order", { ascending: true });
     if (data && data.length > 0) {
       const migrated = await migrateOldStructure(data);
-      setItems(migrated || data);
+      const finalItems = migrated || data;
+      setItems(finalItems);
+
+      // Load multi-files for all items in parallel
+      const { data: filesData } = await supabase
+        .from("cfo_item_files")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      const map: Record<string, CfoFile[]> = {};
+      ((filesData as CfoFile[]) || []).forEach((f) => {
+        if (!map[f.cfo_item_id]) map[f.cfo_item_id] = [];
+        map[f.cfo_item_id].push(f);
+      });
+      setFilesByItem(map);
     } else {
       await initializeChecklist();
     }
@@ -331,11 +348,25 @@ const CFOModule = () => {
   const isVisualSlot = (item: any) => item.slot_type === "visual";
   const isDocumentSlot = (item: any) => !item.slot_type || item.slot_type === "document";
 
-  const isSlotFilled = (item: any): boolean => {
+  const isSlotFilled = useCallback((item: any): boolean => {
     if (isTextSlot(item)) return !!(item.text_content && item.text_content.trim());
+    // Document/visual slot is filled when at least 1 file exists
+    const files = filesByItem[item.id] || [];
+    if (files.length > 0) return true;
+    // Legacy fallback for items not yet migrated visually
     return item.is_completed && !!item.file_url;
-  };
+  }, [filesByItem]);
 
+  const refreshFilesForItem = useCallback(async (itemId: string) => {
+    if (!projectId) return;
+    const { data } = await supabase
+      .from("cfo_item_files")
+      .select("*")
+      .eq("cfo_item_id", itemId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    setFilesByItem((prev) => ({ ...prev, [itemId]: (data as CfoFile[]) || [] }));
+  }, [projectId]);
   /* ── Handlers ─────────────────────────────────────── */
   const togglePreview = async (item: any) => {
     if (expandedItem === item.id) { setExpandedItem(null); return; }
@@ -628,108 +659,161 @@ const CFOModule = () => {
       coverV1.drawText(`Fecha de emision: ${today}`, { x: 50, y: ch - 450, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
 
       // Collect all content pages for TOC calculation
-      interface TocEntry { title: string; page: number; isFolder: boolean; volume: number; }
+      // TOC levels: 0 = volume header, 1 = folder/slot, 2 = nested file (custom_title)
+      interface TocEntry { title: string; page: number; level: 0 | 1 | 2; volume: number; }
       const tocEntries: TocEntry[] = [];
       const vol1Folders = FOLDERS.filter(f => f.volume === 1);
       const vol2Folders = FOLDERS.filter(f => f.volume === 2);
 
-      // Pre-calculate document page counts
-      const folderDocsMap: Map<number, { item: any; blob: Blob; pageCount: number }[]> = new Map();
-      for (const folder of FOLDERS) {
-        const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
-        const completedDocs = folderItems.filter(i => i.is_completed && i.file_url);
-        const docBlobs: { item: any; blob: Blob; pageCount: number }[] = [];
-        for (const item of completedDocs) {
-          const { data } = await supabase.storage.from("plans").download(item.file_url);
-          if (data) {
-            const ext = (item.file_name || "").toLowerCase();
-            if (ext.endsWith(".pdf")) {
-              try {
-                const arrBuf = await data.arrayBuffer();
-                const srcDoc = await PDFDocument.load(arrBuf);
-                docBlobs.push({ item, blob: data, pageCount: srcDoc.getPageCount() });
-              } catch { docBlobs.push({ item, blob: data, pageCount: 1 }); }
-            } else {
-              docBlobs.push({ item, blob: data, pageCount: 1 });
-            }
+      // Pre-load all multi-files per slot with page counts
+      interface SlotFileBlob { file: CfoFile; blob: Blob; pageCount: number; }
+      const slotFilesMap: Map<string, SlotFileBlob[]> = new Map();
+      for (const item of items) {
+        const itemFiles = filesByItem[item.id] || [];
+        const blobs: SlotFileBlob[] = [];
+        for (const file of itemFiles) {
+          const { data } = await supabase.storage.from("plans").download(file.file_url);
+          if (!data) continue;
+          const ext = (file.file_name || "").toLowerCase();
+          if (ext.endsWith(".pdf")) {
+            try {
+              const arrBuf = await data.arrayBuffer();
+              const srcDoc = await PDFDocument.load(arrBuf);
+              blobs.push({ file, blob: data, pageCount: srcDoc.getPageCount() });
+            } catch { blobs.push({ file, blob: data, pageCount: 1 }); }
+          } else {
+            blobs.push({ file, blob: data, pageCount: 1 });
           }
         }
-        folderDocsMap.set(folder.index, docBlobs);
+        slotFilesMap.set(item.id, blobs);
       }
 
-      // Calculate TOC size
-      let tocEntryCount = 0;
+      // Calculate TOC entry count
+      let tocEntryCount = 2; // 2 volume headers
       for (const folder of FOLDERS) {
-        tocEntryCount++; // folder header
+        tocEntryCount++; // folder
         const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
         const textItems = folderItems.filter(i => isTextSlot(i) && i.text_content?.trim());
-        const docItems = folderDocsMap.get(folder.index) || [];
-        tocEntryCount += textItems.length + docItems.length;
+        const docItems = folderItems.filter(i => !isTextSlot(i) && (slotFilesMap.get(i.id) || []).length > 0);
+        if (textItems.length > 0) tocEntryCount++;
+        for (const di of docItems) {
+          tocEntryCount++;
+          tocEntryCount += (slotFilesMap.get(di.id) || []).length;
+        }
       }
-      tocEntryCount += 2; // Volume separators
-      const tocLinesPerPage = Math.floor((842 - 120) / 18);
+      const tocLinesPerPage = Math.floor((842 - 120) / 16);
       const tocPageCount = Math.max(1, Math.ceil(tocEntryCount / tocLinesPerPage));
 
       // Page counting: Cover V1 (1) + TOC pages + content...
       let currentPage = 1 + tocPageCount + 1;
 
-      // Volume 1 content
+      // Volume 1 entries
+      tocEntries.push({ title: "VOLUMEN 1 — CUERPO DEL LIBRO", page: currentPage, level: 0, volume: 1 });
       for (const folder of vol1Folders) {
-        tocEntries.push({ title: folder.title, page: currentPage, isFolder: true, volume: 1 });
+        tocEntries.push({ title: folder.title, page: currentPage, level: 1, volume: 1 });
         currentPage++; // section separator
         const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
         const textItems = folderItems.filter(i => isTextSlot(i) && i.text_content?.trim());
         if (textItems.length > 0) {
-          tocEntries.push({ title: "Datos de texto", page: currentPage, isFolder: false, volume: 1 });
-          currentPage++; // text page
+          tocEntries.push({ title: "Datos de texto", page: currentPage, level: 2, volume: 1 });
+          currentPage++;
         }
-        const docBlobs = folderDocsMap.get(folder.index) || [];
-        for (const { item, pageCount } of docBlobs) {
-          tocEntries.push({ title: item.title, page: currentPage, isFolder: false, volume: 1 });
-          currentPage += pageCount;
+        const docItems = folderItems.filter(i => !isTextSlot(i) && (slotFilesMap.get(i.id) || []).length > 0);
+        for (const di of docItems) {
+          tocEntries.push({ title: di.title, page: currentPage, level: 1, volume: 1 });
+          for (const sf of slotFilesMap.get(di.id) || []) {
+            tocEntries.push({ title: sf.file.custom_title, page: currentPage, level: 2, volume: 1 });
+            currentPage += sf.pageCount;
+          }
         }
       }
 
-      // Cover V2
-      tocEntries.push({ title: "VOLUMEN 2 — ARCHIVO VIVO (Parte IV)", page: currentPage, isFolder: true, volume: 2 });
-      currentPage++; // cover V2
+      // Volume 2 cover
+      tocEntries.push({ title: "VOLUMEN 2 — ARCHIVO VIVO (Parte IV)", page: currentPage, level: 0, volume: 2 });
+      currentPage++;
 
-      // Volume 2 content
+      // Volume 2 entries
       for (const folder of vol2Folders) {
-        tocEntries.push({ title: folder.title, page: currentPage, isFolder: true, volume: 2 });
-        currentPage++; // section separator
-        const docBlobs = folderDocsMap.get(folder.index) || [];
-        for (const { item, pageCount } of docBlobs) {
-          tocEntries.push({ title: item.title, page: currentPage, isFolder: false, volume: 2 });
-          currentPage += pageCount;
+        tocEntries.push({ title: folder.title, page: currentPage, level: 1, volume: 2 });
+        currentPage++;
+        const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
+        const docItems = folderItems.filter(i => !isTextSlot(i) && (slotFilesMap.get(i.id) || []).length > 0);
+        for (const di of docItems) {
+          tocEntries.push({ title: di.title, page: currentPage, level: 1, volume: 2 });
+          for (const sf of slotFilesMap.get(di.id) || []) {
+            tocEntries.push({ title: sf.file.custom_title, page: currentPage, level: 2, volume: 2 });
+            currentPage += sf.pageCount;
+          }
         }
       }
 
       const totalPages = currentPage - 1;
 
-      /* ── TOC Pages ── */
+      /* ── TOC Pages (hierarchical: volume → folder/slot → custom file) ── */
       let tocY = 842 - 90;
       let currentTocPage = pdfDoc.addPage([595, 842]);
       currentTocPage.drawText("INDICE GENERAL", { x: 50, y: 842 - 55, size: 16, font: fontBold });
+
+      const indents = { 0: 50, 1: 65, 2: 90 } as const;
+      const sizes = { 0: 11, 1: 10, 2: 8 } as const;
+      const spacing = { 0: 24, 1: 18, 2: 14 } as const;
+
+      const embedDocument = async (
+        title: string,
+        fileName: string,
+        blob: Blob,
+      ) => {
+        const ext = (fileName || "").toLowerCase();
+        if (ext.endsWith(".pdf")) {
+          try {
+            const arrBuf = await blob.arrayBuffer();
+            const srcDoc = await PDFDocument.load(arrBuf);
+            const copiedPages = await pdfDoc.copyPages(srcDoc, srcDoc.getPageIndices());
+            copiedPages.forEach((p) => pdfDoc.addPage(p));
+          } catch {
+            const errPage = pdfDoc.addPage([595, 842]);
+            errPage.drawText(`Documento: ${title}`, { x: 50, y: 780, size: 12, font: fontBold });
+            errPage.drawText(`Archivo: ${fileName} (no embebible)`, { x: 50, y: 760, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+          }
+        } else if (ext.endsWith(".jpg") || ext.endsWith(".jpeg") || ext.endsWith(".png")) {
+          try {
+            const arrBuf = await blob.arrayBuffer();
+            const image = ext.endsWith(".png") ? await pdfDoc.embedPng(arrBuf) : await pdfDoc.embedJpg(arrBuf);
+            const imgPage = pdfDoc.addPage([595, 842]);
+            const imgDims = image.scaleToFit(495, 700);
+            imgPage.drawImage(image, { x: (595 - imgDims.width) / 2, y: (842 - imgDims.height) / 2, width: imgDims.width, height: imgDims.height });
+            imgPage.drawText(title, { x: 50, y: 820, size: 9, font, color: rgb(0.3, 0.3, 0.3) });
+          } catch {
+            const errPage = pdfDoc.addPage([595, 842]);
+            errPage.drawText(`Imagen: ${fileName} (error)`, { x: 50, y: 780, size: 10, font });
+          }
+        } else {
+          const docPage = pdfDoc.addPage([595, 842]);
+          docPage.drawText(`Documento: ${title}`, { x: 50, y: 780, size: 12, font: fontBold });
+          docPage.drawText(`Archivo: ${fileName}`, { x: 50, y: 760, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+        }
+      };
 
       for (const entry of tocEntries) {
         if (tocY < 55) {
           currentTocPage = pdfDoc.addPage([595, 842]);
           tocY = 842 - 55;
         }
-        const label = entry.isFolder ? entry.title : `    ${entry.title}`;
+        const x = indents[entry.level];
+        const size = sizes[entry.level];
+        const useFont = entry.level === 0 ? fontBold : entry.level === 1 ? fontBold : font;
+        const prefix = entry.level === 2 ? "→ " : "";
+        const label = `${prefix}${entry.title}`;
         const pageLabel = `Pag. ${entry.page}`;
-        const entryFont = entry.isFolder ? fontBold : font;
-        const entrySize = entry.isFolder ? 10 : 9;
-        const labelWidth = entryFont.widthOfTextAtSize(label, entrySize);
+        const labelWidth = useFont.widthOfTextAtSize(label, size);
         const pageWidth = font.widthOfTextAtSize(pageLabel, 8);
-        const dotsStart = 50 + labelWidth + 4;
+        const dotsStart = x + labelWidth + 4;
         const dotsEnd = 545 - pageWidth - 4;
         const dotStr = ".".repeat(Math.max(0, Math.floor((dotsEnd - dotsStart) / 3)));
-        currentTocPage.drawText(label, { x: 50, y: tocY, size: entrySize, font: entryFont, color: rgb(0, 0, 0) });
+        currentTocPage.drawText(label, { x, y: tocY, size, font: useFont, color: rgb(0, 0, 0) });
         if (dotStr.length > 0) currentTocPage.drawText(dotStr, { x: dotsStart, y: tocY, size: 7, font, color: rgb(0.7, 0.7, 0.7) });
         currentTocPage.drawText(pageLabel, { x: 545 - pageWidth, y: tocY, size: 8, font, color: rgb(0.3, 0.3, 0.3) });
-        tocY -= entry.isFolder ? 22 : 16;
+        tocY -= spacing[entry.level];
       }
 
       /* ── Volume 1 Content ── */
@@ -741,20 +825,17 @@ const CFOModule = () => {
         sepPage.drawText(folder.title.toUpperCase(), { x: 50, y: sh / 2 - 10, size: 14, font: fontBold });
         sepPage.drawText("Volumen 1", { x: 50, y: sh / 2 - 35, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
 
-        const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
+        const folderItems = items.filter((i) => (i.folder_index || 1) === folder.index);
 
         // Text content page
-        const textItems = folderItems.filter(i => isTextSlot(i) && i.text_content?.trim());
+        const textItems = folderItems.filter((i) => isTextSlot(i) && i.text_content?.trim());
         if (textItems.length > 0) {
           const textPage = pdfDoc.addPage([595, 842]);
           let ty = 842 - 60;
           textPage.drawText(folder.title, { x: 50, y: ty, size: 12, font: fontBold });
           ty -= 30;
           for (const ti of textItems) {
-            if (ty < 80) {
-              const np = pdfDoc.addPage([595, 842]);
-              ty = 842 - 60;
-            }
+            if (ty < 80) { ty = 842 - 60; }
             textPage.drawText(`${ti.title}:`, { x: 50, y: ty, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2) });
             ty -= 14;
             const lines = (ti.text_content || "").split("\n");
@@ -767,37 +848,11 @@ const CFOModule = () => {
           }
         }
 
-        // Embedded documents
-        const docBlobs = folderDocsMap.get(folder.index) || [];
-        for (const { item, blob } of docBlobs) {
-          const ext = (item.file_name || "").toLowerCase();
-          if (ext.endsWith(".pdf")) {
-            try {
-              const arrBuf = await blob.arrayBuffer();
-              const srcDoc = await PDFDocument.load(arrBuf);
-              const copiedPages = await pdfDoc.copyPages(srcDoc, srcDoc.getPageIndices());
-              copiedPages.forEach(p => pdfDoc.addPage(p));
-            } catch {
-              const errPage = pdfDoc.addPage([595, 842]);
-              errPage.drawText(`Documento: ${item.title}`, { x: 50, y: 780, size: 12, font: fontBold });
-              errPage.drawText(`Archivo: ${item.file_name} (no embebible)`, { x: 50, y: 760, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
-            }
-          } else if (ext.endsWith(".jpg") || ext.endsWith(".jpeg") || ext.endsWith(".png")) {
-            try {
-              const arrBuf = await blob.arrayBuffer();
-              const image = ext.endsWith(".png") ? await pdfDoc.embedPng(arrBuf) : await pdfDoc.embedJpg(arrBuf);
-              const imgPage = pdfDoc.addPage([595, 842]);
-              const imgDims = image.scaleToFit(495, 700);
-              imgPage.drawImage(image, { x: (595 - imgDims.width) / 2, y: (842 - imgDims.height) / 2, width: imgDims.width, height: imgDims.height });
-              imgPage.drawText(item.title, { x: 50, y: 820, size: 9, font, color: rgb(0.3, 0.3, 0.3) });
-            } catch {
-              const errPage = pdfDoc.addPage([595, 842]);
-              errPage.drawText(`Imagen: ${item.file_name} (error)`, { x: 50, y: 780, size: 10, font });
-            }
-          } else {
-            const docPage = pdfDoc.addPage([595, 842]);
-            docPage.drawText(`Documento: ${item.title}`, { x: 50, y: 780, size: 12, font: fontBold });
-            docPage.drawText(`Archivo: ${item.file_name} (formato no embebible)`, { x: 50, y: 760, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+        // Multi-files per slot
+        const docItems = folderItems.filter((i) => !isTextSlot(i) && (slotFilesMap.get(i.id) || []).length > 0);
+        for (const di of docItems) {
+          for (const sf of slotFilesMap.get(di.id) || []) {
+            await embedDocument(sf.file.custom_title, sf.file.file_name, sf.blob);
           }
         }
       }
@@ -821,35 +876,11 @@ const CFOModule = () => {
         sepPage.drawText(folder.title.toUpperCase(), { x: 50, y: sh / 2 - 10, size: 14, font: fontBold });
         sepPage.drawText("Volumen 2 — Archivo Vivo", { x: 50, y: sh / 2 - 35, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
 
-        const docBlobs = folderDocsMap.get(folder.index) || [];
-        for (const { item, blob } of docBlobs) {
-          const ext = (item.file_name || "").toLowerCase();
-          if (ext.endsWith(".pdf")) {
-            try {
-              const arrBuf = await blob.arrayBuffer();
-              const srcDoc = await PDFDocument.load(arrBuf);
-              const copiedPages = await pdfDoc.copyPages(srcDoc, srcDoc.getPageIndices());
-              copiedPages.forEach(p => pdfDoc.addPage(p));
-            } catch {
-              const errPage = pdfDoc.addPage([595, 842]);
-              errPage.drawText(`Documento: ${item.title} (no embebible)`, { x: 50, y: 780, size: 12, font: fontBold });
-            }
-          } else if (ext.endsWith(".jpg") || ext.endsWith(".jpeg") || ext.endsWith(".png")) {
-            try {
-              const arrBuf = await blob.arrayBuffer();
-              const image = ext.endsWith(".png") ? await pdfDoc.embedPng(arrBuf) : await pdfDoc.embedJpg(arrBuf);
-              const imgPage = pdfDoc.addPage([595, 842]);
-              const imgDims = image.scaleToFit(495, 700);
-              imgPage.drawImage(image, { x: (595 - imgDims.width) / 2, y: (842 - imgDims.height) / 2, width: imgDims.width, height: imgDims.height });
-              imgPage.drawText(item.title, { x: 50, y: 820, size: 9, font, color: rgb(0.3, 0.3, 0.3) });
-            } catch {
-              const errPage = pdfDoc.addPage([595, 842]);
-              errPage.drawText(`Imagen: ${item.file_name} (error)`, { x: 50, y: 780, size: 10, font });
-            }
-          } else {
-            const docPage = pdfDoc.addPage([595, 842]);
-            docPage.drawText(`Documento: ${item.title}`, { x: 50, y: 780, size: 12, font: fontBold });
-            docPage.drawText(`Archivo: ${item.file_name}`, { x: 50, y: 760, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
+        const folderItems = items.filter((i) => (i.folder_index || 1) === folder.index);
+        const docItems = folderItems.filter((i) => !isTextSlot(i) && (slotFilesMap.get(i.id) || []).length > 0);
+        for (const di of docItems) {
+          for (const sf of slotFilesMap.get(di.id) || []) {
+            await embedDocument(sf.file.custom_title, sf.file.file_name, sf.blob);
           }
         }
       }
@@ -1020,6 +1051,8 @@ const CFOModule = () => {
                             <SlotRow
                               key={item.id}
                               item={item}
+                              projectId={projectId!}
+                              filesCount={(filesByItem[item.id] || []).length}
                               isAdmin={isAdmin}
                               userRole={userRole}
                               user={user}
@@ -1195,6 +1228,8 @@ const CFOModule = () => {
    ═══════════════════════════════════════════════════════════ */
 interface SlotRowProps {
   item: any;
+  projectId: string;
+  filesCount: number;
   isAdmin: boolean;
   userRole: AppRole | undefined;
   user: any;
@@ -1224,7 +1259,7 @@ interface SlotRowProps {
 }
 
 const SlotRow = ({
-  item, isAdmin, userRole, user, expandedItem, previewUrls, uploadingId,
+  item, projectId, filesCount, isAdmin, userRole, user, expandedItem, previewUrls, uploadingId,
   isSlotFilled: checkFilled, isTextSlot: checkText, isVisualSlot: checkVisual,
   canUploadItem: canUpload, canManageUploadedItem: canManage, canEditTextSlot: canEditText,
   togglePreview, handleFileUpload, handleDownloadItem, handleReplaceFile, handleDeleteFile,
@@ -1240,14 +1275,24 @@ const SlotRow = ({
   const isText = checkText(item);
   const isVisual = checkVisual(item);
   const isDoc = !isText && !isVisual;
-  const isCompleted = item.is_completed;
+  const isCompleted = filled;
   const isValidated = item.validated_by_deo;
   const isRejected = !!item.rejection_reason && !isValidated;
   const isPending = !filled;
-  const isExpanded = expandedItem === item.id;
   const canUp = canUpload(item);
   const canMan = canManage(item);
   const isMandatory = item.is_mandatory;
+
+  return (
+    <div>
+      <div
+        className={`flex flex-col sm:flex-row sm:items-start justify-between p-3 rounded border transition-all gap-2 ${
+          isRejected ? "border-destructive/50 bg-destructive/5" :
+          isValidated ? "border-success/50 bg-success/10" :
+          filled ? "border-success/30 bg-success/5" :
+          item.claimed_at ? "border-destructive/30 bg-destructive/5" : "border-border hover:border-foreground/10"
+        }`}
+      >
 
   return (
     <div>
