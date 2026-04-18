@@ -18,6 +18,7 @@ import {
   Plus, Edit2, BookOpen, Lock, AlertTriangle,
 } from "lucide-react";
 import DocumentPreview from "@/components/DocumentPreview";
+import MultiFileSlotManager, { type CfoFile } from "@/components/MultiFileSlotManager";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
