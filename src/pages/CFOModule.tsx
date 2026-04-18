@@ -271,7 +271,22 @@ const CFOModule = () => {
       .order("sort_order", { ascending: true });
     if (data && data.length > 0) {
       const migrated = await migrateOldStructure(data);
-      setItems(migrated || data);
+      const finalItems = migrated || data;
+      setItems(finalItems);
+
+      // Load multi-files for all items in parallel
+      const { data: filesData } = await supabase
+        .from("cfo_item_files")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      const map: Record<string, CfoFile[]> = {};
+      ((filesData as CfoFile[]) || []).forEach((f) => {
+        if (!map[f.cfo_item_id]) map[f.cfo_item_id] = [];
+        map[f.cfo_item_id].push(f);
+      });
+      setFilesByItem(map);
     } else {
       await initializeChecklist();
     }
