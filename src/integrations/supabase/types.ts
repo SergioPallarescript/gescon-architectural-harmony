@@ -146,6 +146,66 @@ export type Database = {
           },
         ]
       }
+      cfo_item_files: {
+        Row: {
+          cfo_item_id: string
+          created_at: string
+          custom_title: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          project_id: string
+          sort_order: number
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          cfo_item_id: string
+          created_at?: string
+          custom_title: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          project_id: string
+          sort_order?: number
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          cfo_item_id?: string
+          created_at?: string
+          custom_title?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          project_id?: string
+          sort_order?: number
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cfo_item_files_cfo_item_id_fkey"
+            columns: ["cfo_item_id"]
+            isOneToOne: false
+            referencedRelation: "cfo_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cfo_item_files_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cfo_items: {
         Row: {
           allowed_roles: string[] | null
