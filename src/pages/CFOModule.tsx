@@ -348,11 +348,25 @@ const CFOModule = () => {
   const isVisualSlot = (item: any) => item.slot_type === "visual";
   const isDocumentSlot = (item: any) => !item.slot_type || item.slot_type === "document";
 
-  const isSlotFilled = (item: any): boolean => {
+  const isSlotFilled = useCallback((item: any): boolean => {
     if (isTextSlot(item)) return !!(item.text_content && item.text_content.trim());
+    // Document/visual slot is filled when at least 1 file exists
+    const files = filesByItem[item.id] || [];
+    if (files.length > 0) return true;
+    // Legacy fallback for items not yet migrated visually
     return item.is_completed && !!item.file_url;
-  };
+  }, [filesByItem]);
 
+  const refreshFilesForItem = useCallback(async (itemId: string) => {
+    if (!projectId) return;
+    const { data } = await supabase
+      .from("cfo_item_files")
+      .select("*")
+      .eq("cfo_item_id", itemId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    setFilesByItem((prev) => ({ ...prev, [itemId]: (data as CfoFile[]) || [] }));
+  }, [projectId]);
   /* ── Handlers ─────────────────────────────────────── */
   const togglePreview = async (item: any) => {
     if (expandedItem === item.id) { setExpandedItem(null); return; }
