@@ -659,80 +659,91 @@ const CFOModule = () => {
       coverV1.drawText(`Fecha de emision: ${today}`, { x: 50, y: ch - 450, size: 10, font, color: rgb(0.5, 0.5, 0.5) });
 
       // Collect all content pages for TOC calculation
-      interface TocEntry { title: string; page: number; isFolder: boolean; volume: number; }
+      // TOC levels: 0 = volume header, 1 = folder/slot, 2 = nested file (custom_title)
+      interface TocEntry { title: string; page: number; level: 0 | 1 | 2; volume: number; }
       const tocEntries: TocEntry[] = [];
       const vol1Folders = FOLDERS.filter(f => f.volume === 1);
       const vol2Folders = FOLDERS.filter(f => f.volume === 2);
 
-      // Pre-calculate document page counts
-      const folderDocsMap: Map<number, { item: any; blob: Blob; pageCount: number }[]> = new Map();
-      for (const folder of FOLDERS) {
-        const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
-        const completedDocs = folderItems.filter(i => i.is_completed && i.file_url);
-        const docBlobs: { item: any; blob: Blob; pageCount: number }[] = [];
-        for (const item of completedDocs) {
-          const { data } = await supabase.storage.from("plans").download(item.file_url);
-          if (data) {
-            const ext = (item.file_name || "").toLowerCase();
-            if (ext.endsWith(".pdf")) {
-              try {
-                const arrBuf = await data.arrayBuffer();
-                const srcDoc = await PDFDocument.load(arrBuf);
-                docBlobs.push({ item, blob: data, pageCount: srcDoc.getPageCount() });
-              } catch { docBlobs.push({ item, blob: data, pageCount: 1 }); }
-            } else {
-              docBlobs.push({ item, blob: data, pageCount: 1 });
-            }
+      // Pre-load all multi-files per slot with page counts
+      interface SlotFileBlob { file: CfoFile; blob: Blob; pageCount: number; }
+      const slotFilesMap: Map<string, SlotFileBlob[]> = new Map();
+      for (const item of items) {
+        const itemFiles = filesByItem[item.id] || [];
+        const blobs: SlotFileBlob[] = [];
+        for (const file of itemFiles) {
+          const { data } = await supabase.storage.from("plans").download(file.file_url);
+          if (!data) continue;
+          const ext = (file.file_name || "").toLowerCase();
+          if (ext.endsWith(".pdf")) {
+            try {
+              const arrBuf = await data.arrayBuffer();
+              const srcDoc = await PDFDocument.load(arrBuf);
+              blobs.push({ file, blob: data, pageCount: srcDoc.getPageCount() });
+            } catch { blobs.push({ file, blob: data, pageCount: 1 }); }
+          } else {
+            blobs.push({ file, blob: data, pageCount: 1 });
           }
         }
-        folderDocsMap.set(folder.index, docBlobs);
+        slotFilesMap.set(item.id, blobs);
       }
 
-      // Calculate TOC size
-      let tocEntryCount = 0;
+      // Calculate TOC entry count
+      let tocEntryCount = 2; // 2 volume headers
       for (const folder of FOLDERS) {
-        tocEntryCount++; // folder header
+        tocEntryCount++; // folder
         const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
         const textItems = folderItems.filter(i => isTextSlot(i) && i.text_content?.trim());
-        const docItems = folderDocsMap.get(folder.index) || [];
-        tocEntryCount += textItems.length + docItems.length;
+        const docItems = folderItems.filter(i => !isTextSlot(i) && (slotFilesMap.get(i.id) || []).length > 0);
+        if (textItems.length > 0) tocEntryCount++;
+        for (const di of docItems) {
+          tocEntryCount++;
+          tocEntryCount += (slotFilesMap.get(di.id) || []).length;
+        }
       }
-      tocEntryCount += 2; // Volume separators
-      const tocLinesPerPage = Math.floor((842 - 120) / 18);
+      const tocLinesPerPage = Math.floor((842 - 120) / 16);
       const tocPageCount = Math.max(1, Math.ceil(tocEntryCount / tocLinesPerPage));
 
       // Page counting: Cover V1 (1) + TOC pages + content...
       let currentPage = 1 + tocPageCount + 1;
 
-      // Volume 1 content
+      // Volume 1 entries
+      tocEntries.push({ title: "VOLUMEN 1 — CUERPO DEL LIBRO", page: currentPage, level: 0, volume: 1 });
       for (const folder of vol1Folders) {
-        tocEntries.push({ title: folder.title, page: currentPage, isFolder: true, volume: 1 });
+        tocEntries.push({ title: folder.title, page: currentPage, level: 1, volume: 1 });
         currentPage++; // section separator
         const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
         const textItems = folderItems.filter(i => isTextSlot(i) && i.text_content?.trim());
         if (textItems.length > 0) {
-          tocEntries.push({ title: "Datos de texto", page: currentPage, isFolder: false, volume: 1 });
-          currentPage++; // text page
+          tocEntries.push({ title: "Datos de texto", page: currentPage, level: 2, volume: 1 });
+          currentPage++;
         }
-        const docBlobs = folderDocsMap.get(folder.index) || [];
-        for (const { item, pageCount } of docBlobs) {
-          tocEntries.push({ title: item.title, page: currentPage, isFolder: false, volume: 1 });
-          currentPage += pageCount;
+        const docItems = folderItems.filter(i => !isTextSlot(i) && (slotFilesMap.get(i.id) || []).length > 0);
+        for (const di of docItems) {
+          tocEntries.push({ title: di.title, page: currentPage, level: 1, volume: 1 });
+          for (const sf of slotFilesMap.get(di.id) || []) {
+            tocEntries.push({ title: sf.file.custom_title, page: currentPage, level: 2, volume: 1 });
+            currentPage += sf.pageCount;
+          }
         }
       }
 
-      // Cover V2
-      tocEntries.push({ title: "VOLUMEN 2 — ARCHIVO VIVO (Parte IV)", page: currentPage, isFolder: true, volume: 2 });
-      currentPage++; // cover V2
+      // Volume 2 cover
+      tocEntries.push({ title: "VOLUMEN 2 — ARCHIVO VIVO (Parte IV)", page: currentPage, level: 0, volume: 2 });
+      currentPage++;
 
-      // Volume 2 content
+      // Volume 2 entries
       for (const folder of vol2Folders) {
-        tocEntries.push({ title: folder.title, page: currentPage, isFolder: true, volume: 2 });
-        currentPage++; // section separator
-        const docBlobs = folderDocsMap.get(folder.index) || [];
-        for (const { item, pageCount } of docBlobs) {
-          tocEntries.push({ title: item.title, page: currentPage, isFolder: false, volume: 2 });
-          currentPage += pageCount;
+        tocEntries.push({ title: folder.title, page: currentPage, level: 1, volume: 2 });
+        currentPage++;
+        const folderItems = items.filter(i => (i.folder_index || 1) === folder.index);
+        const docItems = folderItems.filter(i => !isTextSlot(i) && (slotFilesMap.get(i.id) || []).length > 0);
+        for (const di of docItems) {
+          tocEntries.push({ title: di.title, page: currentPage, level: 1, volume: 2 });
+          for (const sf of slotFilesMap.get(di.id) || []) {
+            tocEntries.push({ title: sf.file.custom_title, page: currentPage, level: 2, volume: 2 });
+            currentPage += sf.pageCount;
+          }
         }
       }
 
