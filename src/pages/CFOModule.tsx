@@ -1259,7 +1259,7 @@ interface SlotRowProps {
 }
 
 const SlotRow = ({
-  item, isAdmin, userRole, user, expandedItem, previewUrls, uploadingId,
+  item, projectId, filesCount, isAdmin, userRole, user, expandedItem, previewUrls, uploadingId,
   isSlotFilled: checkFilled, isTextSlot: checkText, isVisualSlot: checkVisual,
   canUploadItem: canUpload, canManageUploadedItem: canManage, canEditTextSlot: canEditText,
   togglePreview, handleFileUpload, handleDownloadItem, handleReplaceFile, handleDeleteFile,
