@@ -102,7 +102,7 @@ export const validateVolume1Field = async (projectId: string, field: string) => 
   const aiField = `${field}_ai`;
   const { error } = await supabase
     .from("cfo_volume1_data")
-    .update({ [aiField]: false })
+    .update({ [aiField]: false } as never)
     .eq("project_id", projectId);
   if (error) throw error;
 };
