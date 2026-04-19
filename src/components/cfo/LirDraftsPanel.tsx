@@ -168,7 +168,7 @@ export const LirDraftsPanel = ({ projectId, canEdit, refreshKey = 0 }: LirDrafts
                       </span>
                     )}
                     {draft.is_validated && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground border border-border">
                         <Check className="w-2.5 h-2.5" /> Validada
                       </span>
                     )}
