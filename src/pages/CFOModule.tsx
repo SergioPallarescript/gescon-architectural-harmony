@@ -15,10 +15,13 @@ import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import {
   ArrowLeft, CheckCircle2, Circle, Upload, FileText,
   Shield, Bell, Download, RefreshCw, Trash2, ChevronDown, ChevronUp, XCircle, Loader2,
-  Plus, Edit2, BookOpen, Lock, AlertTriangle,
+  Plus, Edit2, BookOpen, Lock, AlertTriangle, Sparkles,
 } from "lucide-react";
 import DocumentPreview from "@/components/DocumentPreview";
 import MultiFileSlotManager, { type CfoFile } from "@/components/MultiFileSlotManager";
+import { Volume1DataPanel } from "@/components/cfo/Volume1DataPanel";
+import { LirDraftsPanel } from "@/components/cfo/LirDraftsPanel";
+import { runCfoAiAnalysis } from "@/lib/cfoAi";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
