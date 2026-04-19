@@ -508,6 +508,20 @@ const CFOModule = () => {
       }
       setAuditing(false);
     }, 500);
+  };
+
+  const handleAiAnalysis = async () => {
+    if (!projectId) return;
+    setAnalyzingAi(true);
+    try {
+      const res = await runCfoAiAnalysis(projectId);
+      toast.success(`IA: ${res.suggestionsApplied} sugerencias aplicadas, ${res.draftsCreated} fichas L/I/N/R nuevas`);
+      setAiRefreshKey((k) => k + 1);
+    } catch (e: any) {
+      toast.error(e?.message || "Error al analizar con IA");
+    } finally {
+      setAnalyzingAi(false);
+    }
     if (user && projectId) {
       await supabase.from("audit_logs").insert({ user_id: user.id, project_id: projectId, action: "cfo_audit_scan", details: { pending_count: items.filter((i) => !isSlotFilled(i)).length } });
     }
