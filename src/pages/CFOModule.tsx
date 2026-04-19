@@ -626,24 +626,25 @@ const CFOModule = () => {
       const refCatastral = projectInfo?.referencia_catastral || "";
       const today = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
-      // Get registration data from text slots
-      const getTextValue = (title: string) => {
-        const item = items.find(i => i.title === title && isTextSlot(i));
-        return item?.text_content?.trim() || "";
-      };
+      // Read registration data from structured cfo_volume1_data table
+      const { data: vol1 } = await supabase
+        .from("cfo_volume1_data")
+        .select("*")
+        .eq("project_id", projectId)
+        .maybeSingle();
 
       const registroData = {
-        municipio: getTextValue("Municipio"),
-        emplazamiento: getTextValue("Emplazamiento"),
-        cp: getTextValue("Código Postal"),
-        nrc: getTextValue("Referencia Catastral (NRC)") || refCatastral,
-        registro: getTextValue("Registro Nº"),
-        tomo: getTextValue("Tomo"),
-        libro: getTextValue("Libro"),
-        folio: getTextValue("Folio"),
-        finca: getTextValue("Finca"),
-        polizaCompania: getTextValue("Póliza Decenal — Compañía"),
-        polizaNumero: getTextValue("Póliza Decenal — Número"),
+        municipio: vol1?.municipio || "",
+        emplazamiento: vol1?.emplazamiento || projectAddress || "",
+        cp: vol1?.codigo_postal || "",
+        nrc: vol1?.nrc || refCatastral,
+        registro: vol1?.registro_numero || "",
+        tomo: vol1?.tomo || "",
+        libro: vol1?.libro || "",
+        folio: vol1?.folio || "",
+        finca: vol1?.finca || "",
+        polizaCompania: vol1?.poliza_decenal_compania || "",
+        polizaNumero: vol1?.poliza_decenal_numero || "",
       };
 
       const addFooter = (page: any, pageNum: number, totalPages: number) => {
