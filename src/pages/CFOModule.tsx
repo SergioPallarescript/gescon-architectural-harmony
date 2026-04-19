@@ -1004,6 +1004,12 @@ const CFOModule = () => {
               <Shield className="h-4 w-4" /> {auditing ? "Escaneando..." : "Auditoría"}
             </Button>
           )}
+          {isAdmin && (
+            <Button onClick={handleAiAnalysis} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={analyzingAi}>
+              {analyzingAi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {analyzingAi ? "Analizando..." : "Analizar con IA"}
+            </Button>
+          )}
           <Button
             onClick={handleExportPDF}
             variant={canCompile ? "default" : "outline"}
