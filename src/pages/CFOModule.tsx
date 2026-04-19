@@ -15,10 +15,13 @@ import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import {
   ArrowLeft, CheckCircle2, Circle, Upload, FileText,
   Shield, Bell, Download, RefreshCw, Trash2, ChevronDown, ChevronUp, XCircle, Loader2,
-  Plus, Edit2, BookOpen, Lock, AlertTriangle,
+  Plus, Edit2, BookOpen, Lock, AlertTriangle, Sparkles,
 } from "lucide-react";
 import DocumentPreview from "@/components/DocumentPreview";
 import MultiFileSlotManager, { type CfoFile } from "@/components/MultiFileSlotManager";
+import { Volume1DataPanel } from "@/components/cfo/Volume1DataPanel";
+import { LirDraftsPanel } from "@/components/cfo/LirDraftsPanel";
+import { runCfoAiAnalysis } from "@/lib/cfoAi";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -146,6 +149,8 @@ const CFOModule = () => {
   const [claimDialog, setClaimDialog] = useState<{ open: boolean; item: any | null }>({ open: false, item: null });
   const [auditing, setAuditing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [analyzingAi, setAnalyzingAi] = useState(false);
+  const [aiRefreshKey, setAiRefreshKey] = useState(0);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; item: any | null }>({ open: false, item: null });
@@ -503,6 +508,20 @@ const CFOModule = () => {
       }
       setAuditing(false);
     }, 500);
+  };
+
+  const handleAiAnalysis = async () => {
+    if (!projectId) return;
+    setAnalyzingAi(true);
+    try {
+      const res = await runCfoAiAnalysis(projectId);
+      toast.success(`IA: ${res.suggestionsApplied} sugerencias aplicadas, ${res.draftsCreated} fichas L/I/N/R nuevas`);
+      setAiRefreshKey((k) => k + 1);
+    } catch (e: any) {
+      toast.error(e?.message || "Error al analizar con IA");
+    } finally {
+      setAnalyzingAi(false);
+    }
     if (user && projectId) {
       await supabase.from("audit_logs").insert({ user_id: user.id, project_id: projectId, action: "cfo_audit_scan", details: { pending_count: items.filter((i) => !isSlotFilled(i)).length } });
     }
@@ -985,6 +1004,12 @@ const CFOModule = () => {
               <Shield className="h-4 w-4" /> {auditing ? "Escaneando..." : "Auditoría"}
             </Button>
           )}
+          {isAdmin && (
+            <Button onClick={handleAiAnalysis} variant="outline" className="font-display text-xs uppercase tracking-wider gap-2" disabled={analyzingAi}>
+              {analyzingAi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {analyzingAi ? "Analizando..." : "Analizar con IA"}
+            </Button>
+          )}
           <Button
             onClick={handleExportPDF}
             variant={canCompile ? "default" : "outline"}
@@ -1044,7 +1069,17 @@ const CFOModule = () => {
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <div className="border border-t-0 border-border rounded-b-lg bg-card/50 p-3 space-y-2">
-                          {folderItems.length === 0 && (
+                          {folder.index === 1 && (
+                            <div className="mb-3">
+                              <Volume1DataPanel projectId={projectId!} canEdit={isAdmin} refreshKey={aiRefreshKey} />
+                            </div>
+                          )}
+                          {folder.index === 3 && (
+                            <div className="mb-3">
+                              <LirDraftsPanel projectId={projectId!} canEdit={isAdmin} refreshKey={aiRefreshKey} />
+                            </div>
+                          )}
+                          {folderItems.length === 0 && folder.index !== 1 && folder.index !== 3 && (
                             <p className="text-xs text-muted-foreground text-center py-4">Sin elementos</p>
                           )}
                           {folderItems.map((item) => (

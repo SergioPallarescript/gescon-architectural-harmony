@@ -310,6 +310,223 @@ export type Database = {
           },
         ]
       }
+      cfo_lir_drafts: {
+        Row: {
+          category: string
+          generated_at: string
+          generated_by: string | null
+          id: string
+          inspeccion: string | null
+          is_validated: boolean
+          limpieza: string | null
+          material_key: string
+          material_label: string
+          normas_uso: string | null
+          project_id: string
+          reparacion: string | null
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          category: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          inspeccion?: string | null
+          is_validated?: boolean
+          limpieza?: string | null
+          material_key: string
+          material_label: string
+          normas_uso?: string | null
+          project_id: string
+          reparacion?: string | null
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          category?: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          inspeccion?: string | null
+          is_validated?: boolean
+          limpieza?: string | null
+          material_key?: string
+          material_label?: string
+          normas_uso?: string | null
+          project_id?: string
+          reparacion?: string | null
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cfo_lir_drafts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cfo_volume1_data: {
+        Row: {
+          codigo_postal: string | null
+          codigo_postal_ai: boolean
+          created_at: string
+          emplazamiento: string | null
+          emplazamiento_ai: boolean
+          fecha_fin_obra: string | null
+          fecha_fin_obra_ai: boolean
+          fecha_inicio_obra: string | null
+          fecha_inicio_obra_ai: boolean
+          fecha_licencia_obra: string | null
+          fecha_licencia_obra_ai: boolean
+          finca: string | null
+          finca_ai: boolean
+          folio: string | null
+          folio_ai: boolean
+          id: string
+          last_ai_scan_at: string | null
+          last_ai_scan_by: string | null
+          libro: string | null
+          libro_ai: boolean
+          municipio: string | null
+          municipio_ai: boolean
+          nrc: string | null
+          nrc_ai: boolean
+          numero_licencia_obra: string | null
+          numero_licencia_obra_ai: boolean
+          numero_plantas: number | null
+          numero_plantas_ai: boolean
+          numero_viviendas: number | null
+          numero_viviendas_ai: boolean
+          poliza_decenal_compania: string | null
+          poliza_decenal_compania_ai: boolean
+          poliza_decenal_numero: string | null
+          poliza_decenal_numero_ai: boolean
+          project_id: string
+          registro_numero: string | null
+          registro_numero_ai: boolean
+          superficie_construida: number | null
+          superficie_construida_ai: boolean
+          superficie_parcela: number | null
+          superficie_parcela_ai: boolean
+          superficie_util: number | null
+          superficie_util_ai: boolean
+          tomo: string | null
+          tomo_ai: boolean
+          updated_at: string
+        }
+        Insert: {
+          codigo_postal?: string | null
+          codigo_postal_ai?: boolean
+          created_at?: string
+          emplazamiento?: string | null
+          emplazamiento_ai?: boolean
+          fecha_fin_obra?: string | null
+          fecha_fin_obra_ai?: boolean
+          fecha_inicio_obra?: string | null
+          fecha_inicio_obra_ai?: boolean
+          fecha_licencia_obra?: string | null
+          fecha_licencia_obra_ai?: boolean
+          finca?: string | null
+          finca_ai?: boolean
+          folio?: string | null
+          folio_ai?: boolean
+          id?: string
+          last_ai_scan_at?: string | null
+          last_ai_scan_by?: string | null
+          libro?: string | null
+          libro_ai?: boolean
+          municipio?: string | null
+          municipio_ai?: boolean
+          nrc?: string | null
+          nrc_ai?: boolean
+          numero_licencia_obra?: string | null
+          numero_licencia_obra_ai?: boolean
+          numero_plantas?: number | null
+          numero_plantas_ai?: boolean
+          numero_viviendas?: number | null
+          numero_viviendas_ai?: boolean
+          poliza_decenal_compania?: string | null
+          poliza_decenal_compania_ai?: boolean
+          poliza_decenal_numero?: string | null
+          poliza_decenal_numero_ai?: boolean
+          project_id: string
+          registro_numero?: string | null
+          registro_numero_ai?: boolean
+          superficie_construida?: number | null
+          superficie_construida_ai?: boolean
+          superficie_parcela?: number | null
+          superficie_parcela_ai?: boolean
+          superficie_util?: number | null
+          superficie_util_ai?: boolean
+          tomo?: string | null
+          tomo_ai?: boolean
+          updated_at?: string
+        }
+        Update: {
+          codigo_postal?: string | null
+          codigo_postal_ai?: boolean
+          created_at?: string
+          emplazamiento?: string | null
+          emplazamiento_ai?: boolean
+          fecha_fin_obra?: string | null
+          fecha_fin_obra_ai?: boolean
+          fecha_inicio_obra?: string | null
+          fecha_inicio_obra_ai?: boolean
+          fecha_licencia_obra?: string | null
+          fecha_licencia_obra_ai?: boolean
+          finca?: string | null
+          finca_ai?: boolean
+          folio?: string | null
+          folio_ai?: boolean
+          id?: string
+          last_ai_scan_at?: string | null
+          last_ai_scan_by?: string | null
+          libro?: string | null
+          libro_ai?: boolean
+          municipio?: string | null
+          municipio_ai?: boolean
+          nrc?: string | null
+          nrc_ai?: boolean
+          numero_licencia_obra?: string | null
+          numero_licencia_obra_ai?: boolean
+          numero_plantas?: number | null
+          numero_plantas_ai?: boolean
+          numero_viviendas?: number | null
+          numero_viviendas_ai?: boolean
+          poliza_decenal_compania?: string | null
+          poliza_decenal_compania_ai?: boolean
+          poliza_decenal_numero?: string | null
+          poliza_decenal_numero_ai?: boolean
+          project_id?: string
+          registro_numero?: string | null
+          registro_numero_ai?: boolean
+          superficie_construida?: number | null
+          superficie_construida_ai?: boolean
+          superficie_parcela?: number | null
+          superficie_parcela_ai?: boolean
+          superficie_util?: number | null
+          superficie_util_ai?: boolean
+          tomo?: string | null
+          tomo_ai?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cfo_volume1_data_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cost_claims: {
         Row: {
           altura: number | null
