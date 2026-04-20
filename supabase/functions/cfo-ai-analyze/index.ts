@@ -175,15 +175,64 @@ Deno.serve(async (req) => {
     const { data: memoryFile } = await supabase.storage.from("plans").download(memoryPath);
     const memoryText = memoryFile ? await memoryFile.text() : "";
 
-    // 2. TODOS los documentos del proyecto (project_documents)
-    const { data: docs } = await supabase
-      .from("project_documents")
-      .select("file_name, file_type, file_url, file_size")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-      .limit(20);
+    // 2. Documentos de TODOS los módulos relevantes
+    type DocSource = { source: string; file_name: string; file_type: string | null; file_url: string; file_size: number | null; priority: number };
+    const allDocs: DocSource[] = [];
 
-    // 3. Texto libre de slots tipo "text" del CFO ya rellenados (memoria de materiales, etc.)
+    // 2.a Documentos del Proyecto
+    const { data: projDocs } = await supabase
+      .from("project_documents")
+      .select("file_name, file_type, file_url, file_size, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+    for (const d of projDocs || []) {
+      const isMemoria = /memoria|proyecto|ejecuc/i.test(d.file_name);
+      allDocs.push({ source: "Documentos Proyecto", file_name: d.file_name, file_type: d.file_type, file_url: d.file_url, file_size: d.file_size, priority: isMemoria ? 1 : 3 });
+    }
+
+    // 2.b Planos Válidos (versión vigente de cada plano)
+    const { data: plansList } = await supabase
+      .from("plans")
+      .select("id, name, current_version")
+      .eq("project_id", projectId);
+    if (plansList && plansList.length) {
+      const planIds = plansList.map((p: any) => p.id);
+      const { data: planVers } = await supabase
+        .from("plan_versions")
+        .select("plan_id, file_name, file_url, file_size, version_number")
+        .in("plan_id", planIds);
+      for (const pl of plansList) {
+        const vers = (planVers || []).filter((v: any) => v.plan_id === pl.id && v.version_number === pl.current_version);
+        for (const v of vers) {
+          allDocs.push({ source: "Planos Válidos", file_name: `[Plano] ${pl.name} - ${v.file_name}`, file_type: null, file_url: v.file_url, file_size: v.file_size, priority: 2 });
+        }
+      }
+    }
+
+    // 2.c Validación Económica (cost_claims con archivo)
+    const { data: claims } = await supabase
+      .from("cost_claims")
+      .select("title, file_name, file_url, doc_type")
+      .eq("project_id", projectId)
+      .not("file_url", "is", null);
+    for (const c of claims || []) {
+      if (!c.file_url || !c.file_name) continue;
+      allDocs.push({ source: "Validación Económica", file_name: `[Económico] ${c.title} - ${c.file_name}`, file_type: null, file_url: c.file_url, file_size: null, priority: 4 });
+    }
+
+    // 2.d Documentos y Firma (signature_documents)
+    const { data: sigDocs } = await supabase
+      .from("signature_documents")
+      .select("title, original_file_name, original_file_path, mime_type, file_size")
+      .eq("project_id", projectId);
+    for (const s of sigDocs || []) {
+      allDocs.push({ source: "Documentos y Firma", file_name: `[Firma] ${s.title} - ${s.original_file_name}`, file_type: s.mime_type, file_url: s.original_file_path, file_size: s.file_size, priority: 4 });
+    }
+
+    // Ordenar por prioridad (memorias y planos primero)
+    allDocs.sort((a, b) => a.priority - b.priority);
+
+    // 3. Texto libre de slots tipo "text" del CFO ya rellenados
     const { data: cfoTextSlots } = await supabase
       .from("cfo_items")
       .select("title, text_content")
@@ -196,14 +245,15 @@ Deno.serve(async (req) => {
       .map((s: any) => `### ${s.title}\n${s.text_content}`)
       .join("\n\n");
 
-    // 4. Construir contenido multimodal: descargamos hasta 8 PDFs/imágenes (límite de tamaño total ~15MB)
-    const MAX_FILES = 8;
-    const MAX_TOTAL_BYTES = 15 * 1024 * 1024;
+    // 4. Construir contenido multimodal: descargamos hasta 12 PDFs/imágenes (límite ~18MB)
+    const MAX_FILES = 12;
+    const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
     let totalBytes = 0;
-    const attachments: { name: string; dataUri: string; mime: string }[] = [];
+    const attachments: { name: string; source: string; dataUri: string; mime: string }[] = [];
     const skipped: string[] = [];
 
-    for (const d of (docs || []).slice(0, MAX_FILES)) {
+    for (const d of allDocs) {
+      if (attachments.length >= MAX_FILES) { skipped.push(`${d.file_name} (límite de archivos)`); continue; }
       const mime = guessMime(d.file_name, d.file_type);
       const isPdf = mime === "application/pdf";
       const isImg = mime.startsWith("image/");
@@ -227,7 +277,7 @@ Deno.serve(async (req) => {
           continue;
         }
         const dataUri = await blobToDataUri(blob, mime);
-        attachments.push({ name: d.file_name, dataUri, mime });
+        attachments.push({ name: d.file_name, source: d.source, dataUri, mime });
         totalBytes += blob.size;
       } catch (e) {
         console.error("download error", d.file_name, e);
@@ -235,15 +285,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`cfo-ai-analyze: ${attachments.length} adjuntos cargados (${(totalBytes / 1024).toFixed(0)}KB), ${skipped.length} omitidos`);
+    console.log(`cfo-ai-analyze: ${attachments.length}/${allDocs.length} adjuntos cargados (${(totalBytes / 1024).toFixed(0)}KB), ${skipped.length} omitidos`);
+
+    const docList = attachments.map((a) => `- [${a.source}] ${a.name}`).join("\n") || "(ninguno)";
 
     const userTextHeader = `PROYECTO: ${project.name}
 DIRECCIÓN: ${project.address || "N/D"}
 REF. CATASTRAL: ${project.referencia_catastral || "N/D"}
 DESCRIPCIÓN: ${project.description || "N/D"}
 
-DOCUMENTOS ADJUNTOS (${attachments.length}): ${attachments.map((a) => a.name).join(", ") || "(ninguno)"}
-${skipped.length ? `OMITIDOS: ${skipped.join("; ")}` : ""}
+DOCUMENTOS ADJUNTOS (${attachments.length} de ${allDocs.length} disponibles):
+${docList}
+${skipped.length ? `\nOMITIDOS: ${skipped.slice(0, 10).join("; ")}` : ""}
 
 CONTENIDO DE SLOTS DE TEXTO YA RELLENADOS EN EL LDE:
 ${cfoTextBlock || "(vacío)"}
@@ -251,7 +304,15 @@ ${cfoTextBlock || "(vacío)"}
 HISTORIAL (Órdenes/Incidencias):
 ${memoryText.slice(0, 8000) || "(sin historial)"}
 
-INSTRUCCIONES: Analiza CUIDADOSAMENTE el contenido completo de los documentos adjuntos (memorias, planos, escrituras, certificados…) y extrae todos los datos que puedas. Devuelve null donde no haya evidencia.`;
+INSTRUCCIONES CRÍTICAS:
+1. RESPONDE EXCLUSIVAMENTE EN ESPAÑOL CASTELLANO. Nunca portugués, nunca otro idioma.
+2. Lee el contenido COMPLETO de cada documento adjunto, incluyendo TABLAS, sub-tablas, cuadros de superficies, leyendas de planos y cajetines.
+3. Para SUPERFICIES (parcela, construida, útil): busca "CUADRO DE SUPERFICIES", "SUPERFICIE ÚTIL", "SUPERFICIE CONSTRUIDA" en memorias y planos. Suma por planta si es necesario.
+4. Para datos REGISTRALES (Tomo/Libro/Folio/Finca/NRC): revisa escrituras y nota simple registral.
+5. Para PÓLIZA DECENAL: revisa certificados de seguro y escrituras de obra nueva.
+6. Para FECHAS de licencia/inicio/fin: revisa licencia municipal, acta de replanteo y certificado final de obra.
+7. Para FICHAS L/I/N/R: detecta materiales en memoria constructiva y planos de detalle. Redacta en español profesional.
+8. Devuelve null SOLO cuando no exista evidencia documental.`;
 
     // Mensaje multimodal: texto + cada documento como image_url (Gemini acepta PDFs vía data URI)
     const userContent: any[] = [{ type: "text", text: userTextHeader }];
