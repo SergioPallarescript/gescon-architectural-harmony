@@ -1838,6 +1838,10 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      extract_project_id_from_path: {
+        Args: { file_path: string }
+        Returns: string
+      }
       get_auth_email: { Args: { _user_id: string }; Returns: string }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       is_project_admin: {
