@@ -108,7 +108,7 @@ export function useVoiceDictation(opts?: {
       nextIndexRef.current = 0;
 
       recognition.onresult = (event: any) => {
-        let addedFinal = "";
+        let nextFinal = finalRef.current;
         let interimPart = "";
         const results = event.results;
         // Procesamos desde el siguiente índice no visto.
@@ -116,19 +116,16 @@ export function useVoiceDictation(opts?: {
           const r = results[i];
           const text = r[0]?.transcript ?? "";
           if (r.isFinal) {
-            addedFinal += text;
+            nextFinal = mergeFinal(nextFinal, text);
             // Avanzamos el cursor: este índice ya está confirmado.
             nextIndexRef.current = i + 1;
           } else {
             interimPart += text;
           }
         }
-        if (addedFinal) {
-          const next = mergeFinal(finalRef.current, addedFinal);
-          if (next !== finalRef.current) {
-            finalRef.current = next;
-            onFinalRef.current?.(next);
-          }
+        if (nextFinal !== finalRef.current) {
+          finalRef.current = nextFinal;
+          onFinalRef.current?.(nextFinal);
         }
         const cleanInterim = interimPart.trim();
         setInterim(cleanInterim);
@@ -259,4 +256,10 @@ function mergeFinal(existing: string, addition: string): string {
 
   const sep = base && !/\s$/.test(existing) ? " " : "";
   return `${base}${sep}${trimmedAdd}`;
+}
+
+function isMobileOrTablet(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua);
 }
