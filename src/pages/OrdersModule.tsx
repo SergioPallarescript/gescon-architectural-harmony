@@ -580,7 +580,7 @@ const OrdersModule = () => {
                              <Sparkles className="h-3 w-3" /> Reestructurar IA
                           </Button>
                           {(content.trim() || structuredSections) && !recording && !cleaning && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => { setContent(""); setStructuredSections(null); finalTranscriptRef.current = ""; }} className="gap-1 text-xs text-muted-foreground">
+                            <Button type="button" variant="ghost" size="sm" onClick={() => { setContent(""); setStructuredSections(null); dictation.reset(""); }} className="gap-1 text-xs text-muted-foreground">
                               <X className="h-3 w-3" /> Limpiar
                             </Button>
                           )}
@@ -595,6 +595,11 @@ const OrdersModule = () => {
                         />
                       ) : (
                         <Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Describa la orden o use el dictado por voz..." rows={5} required={!structuredSections} />
+                      )}
+                      {recording && dictation.interim && (
+                        <p className="text-xs text-muted-foreground italic mt-1">
+                          Escuchando: <span className="opacity-70">{dictation.interim}</span>
+                        </p>
                       )}
                     </div>
 
