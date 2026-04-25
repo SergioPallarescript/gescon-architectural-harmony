@@ -322,6 +322,11 @@ const IncidentsModule = () => {
                         </Button>
                       </div>
                       <Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Describa la incidencia de seguridad..." rows={5} required />
+                      {recording && dictation.interim && (
+                        <p className="text-xs text-muted-foreground italic mt-1">
+                          Escuchando: <span className="opacity-70">{dictation.interim}</span>
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label className="font-display text-xs uppercase tracking-wider text-muted-foreground">Acciones Correctoras</Label>
