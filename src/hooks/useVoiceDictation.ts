@@ -244,7 +244,20 @@ function mergeFinal(existing: string, addition: string): string {
     if (tail.includes(addLower)) return existing;
   }
 
-  // Caso 2: solapamiento parcial entre el final de base y el inicio de add.
+  // Caso 2: solapamiento por palabras entre el final confirmado y el inicio
+  // reemitido. Es el patrón móvil más problemático: tras una pausa llega
+  // "frase anterior + palabras nuevas", y el solapamiento puede ser mucho más
+  // largo que 80 caracteres.
+  const wordOverlap = getWordOverlapCount(base, add);
+  if (wordOverlap > 0) {
+    const addWords = add.trim().split(/\s+/);
+    const remainder = addWords.slice(wordOverlap).join(" ").trim();
+    if (!remainder) return existing;
+    const sep = base && !/\s$/.test(existing) ? " " : "";
+    return `${base}${sep}${remainder}`;
+  }
+
+  // Caso 3: solapamiento parcial entre el final de base y el inicio de add.
   const maxOverlap = Math.min(baseLower.length, addLower.length, 80);
   let overlap = 0;
   for (let n = maxOverlap; n > 0; n--) {
