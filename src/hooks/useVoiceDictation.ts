@@ -42,6 +42,7 @@ export function useVoiceDictation(opts?: {
   const wantRecordingRef = useRef(false);
   // Índice del próximo resultado por procesar dentro del SpeechRecognitionResultList actual.
   const nextIndexRef = useRef(0);
+  const restartTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -52,6 +53,10 @@ export function useVoiceDictation(opts?: {
   }, []);
 
   const cleanup = useCallback(() => {
+    if (restartTimerRef.current !== null) {
+      window.clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
     const r = recognitionRef.current;
     if (r) {
       try { r.onresult = null; } catch {}
@@ -91,9 +96,13 @@ export function useVoiceDictation(opts?: {
 
     const startInstance = () => {
       const recognition = new SR();
+      const autoRestart = !isMobileOrTablet();
       recognitionRef.current = recognition;
       recognition.lang = lang;
-      recognition.continuous = true;
+      // En móvil/tablet los reinicios automáticos tras silencio suelen reemitir
+      // el bloque anterior completo. Preferimos finalizar la toma y que el
+      // usuario pulse de nuevo, antes que triplicar texto legalmente sensible.
+      recognition.continuous = autoRestart;
       recognition.interimResults = true;
       // Reseteamos el índice porque cada instancia tiene su propia lista.
       nextIndexRef.current = 0;
@@ -139,11 +148,12 @@ export function useVoiceDictation(opts?: {
       };
 
       recognition.onend = () => {
-        if (wantRecordingRef.current) {
+        if (wantRecordingRef.current && autoRestart) {
           // Reinicio controlado tras silencio. Esperamos un tick para no
           // colisionar con la instancia actual y re-creamos un reconocedor
           // limpio (índices a 0). El texto final ya confirmado se mantiene.
-          setTimeout(() => {
+          restartTimerRef.current = window.setTimeout(() => {
+            restartTimerRef.current = null;
             if (!wantRecordingRef.current) return;
             try {
               startInstance();
@@ -155,7 +165,10 @@ export function useVoiceDictation(opts?: {
             }
           }, 80);
         } else {
+          wantRecordingRef.current = false;
           setRecording(false);
+          setInterim("");
+          onInterimRef.current?.("");
         }
       };
 
