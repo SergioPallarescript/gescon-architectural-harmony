@@ -52,6 +52,7 @@ const IncidentsModule = () => {
 
   const [project, setProject] = useState<any>(null);
   const [incidents, setIncidents] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [content, setContent] = useState("");
@@ -99,7 +100,25 @@ const IncidentsModule = () => {
     setLoading(false);
   }, [projectId]);
 
-  useEffect(() => { fetchProject(); fetchIncidents(); }, [fetchProject, fetchIncidents]);
+  const fetchMembers = useCallback(async () => {
+    if (!projectId) return;
+    const { data } = await supabase
+      .from("project_members")
+      .select("user_id, role, secondary_role")
+      .eq("project_id", projectId)
+      .eq("status", "accepted");
+    setMembers(data || []);
+  }, [projectId]);
+
+  useEffect(() => { fetchProject(); fetchIncidents(); fetchMembers(); }, [fetchProject, fetchIncidents, fetchMembers]);
+
+  const findRecipientUserId = (dirigida: string): string | null => {
+    if (!dirigida || dirigida === "TODOS LOS AGENTES") return null;
+    const targetRole = DESTINATARIOS_ROLES[dirigida];
+    if (!targetRole) return null;
+    const member = members.find((m: any) => m.role === targetRole || m.secondary_role === targetRole);
+    return member?.user_id || null;
+  };
 
   const getGeoLocation = (): Promise<string> => {
     return new Promise((resolve) => {
