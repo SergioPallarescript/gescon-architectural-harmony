@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildPushHTTPRequest } from "npm:@pushforge/builder";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,99 +7,65 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Web Push crypto helpers
-async function generateJWT(
-  header: Record<string, string>,
-  payload: Record<string, unknown>,
-  privateKeyRaw: string
-): Promise<string> {
-  const enc = new TextEncoder();
-  const b64url = (buf: ArrayBuffer) =>
-    btoa(String.fromCharCode(...new Uint8Array(buf)))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-  const b64urlStr = (s: string) =>
-    btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const VAPID_PUBLIC_KEY_FALLBACK =
+  "BCZM86VhvCpT2YGg_JmWNu9_sp-QvyVC7DyvYanfgQRZTAPrjqwnChaXHGbNS2pJAg5OaLG5iVYvm71FavqmC0g";
 
-  const headerB64 = b64urlStr(JSON.stringify(header));
-  const payloadB64 = b64urlStr(JSON.stringify(payload));
-  const input = `${headerB64}.${payloadB64}`;
-
-  // Import private key
-  const rawKey = Uint8Array.from(
-    atob(privateKeyRaw.replace(/-/g, "+").replace(/_/g, "/")),
-    (c) => c.charCodeAt(0)
-  );
-
-  // Pad to 32 bytes
-  const padded = new Uint8Array(32);
-  padded.set(rawKey.length >= 32 ? rawKey.slice(0, 32) : rawKey, 32 - rawKey.length);
-
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    buildPkcs8(padded),
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"]
-  );
-
-  const sig = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    key,
-    enc.encode(input)
-  );
-
-  return `${input}.${b64url(sig)}`;
+function base64UrlToBytes(value: string): Uint8Array {
+  const normalized = value.trim().replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
 }
 
-function buildPkcs8(rawPrivateKey: Uint8Array): ArrayBuffer {
-  // PKCS8 wrapper for EC P-256 private key
-  const prefix = new Uint8Array([
-    0x30, 0x41, 0x02, 0x01, 0x00, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48,
-    0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03,
-    0x01, 0x07, 0x04, 0x27, 0x30, 0x25, 0x02, 0x01, 0x01, 0x04, 0x20,
-  ]);
-  const result = new Uint8Array(prefix.length + rawPrivateKey.length);
-  result.set(prefix);
-  result.set(rawPrivateKey, prefix.length);
-  return result.buffer;
+function bytesToBase64Url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function toVapidJwk(vapidPublicKey: string, vapidPrivateKey: string): JsonWebKey {
+  const trimmedPrivateKey = vapidPrivateKey.trim();
+  if (trimmedPrivateKey.startsWith("{")) return JSON.parse(trimmedPrivateKey);
+
+  const publicBytes = base64UrlToBytes(vapidPublicKey);
+  const privateBytes = base64UrlToBytes(trimmedPrivateKey);
+  if (publicBytes.length !== 65 || publicBytes[0] !== 4 || privateBytes.length !== 32) {
+    throw new Error("Invalid VAPID key format");
+  }
+
+  return {
+    kty: "EC",
+    crv: "P-256",
+    x: bytesToBase64Url(publicBytes.slice(1, 33)),
+    y: bytesToBase64Url(publicBytes.slice(33, 65)),
+    d: bytesToBase64Url(privateBytes),
+  };
 }
 
 async function sendWebPush(
   subscription: { endpoint: string; p256dh: string; auth: string },
-  payload: string,
+  payload: Record<string, unknown>,
   vapidPublicKey: string,
   vapidPrivateKey: string,
   vapidSubject: string
 ): Promise<Response> {
-  const url = new URL(subscription.endpoint);
-  const audience = `${url.protocol}//${url.host}`;
-
-  const now = Math.floor(Date.now() / 1000);
-  const jwt = await generateJWT(
-    { typ: "JWT", alg: "ES256" },
-    { aud: audience, exp: now + 86400, sub: vapidSubject },
-    vapidPrivateKey
-  );
-
-  const vapidPubKeyBytes = Uint8Array.from(
-    atob(vapidPublicKey.replace(/-/g, "+").replace(/_/g, "/")),
-    (c) => c.charCodeAt(0)
-  );
-  const pubB64 = btoa(String.fromCharCode(...vapidPubKeyBytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
-  return fetch(subscription.endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `vapid t=${jwt}, k=${pubB64}`,
-      "Content-Type": "application/octet-stream",
-      TTL: "86400",
+  const { endpoint, headers, body } = await buildPushHTTPRequest({
+    privateJWK: toVapidJwk(vapidPublicKey, vapidPrivateKey),
+    subscription: {
+      endpoint: subscription.endpoint,
+      keys: { p256dh: subscription.p256dh, auth: subscription.auth },
     },
-    body: new TextEncoder().encode(payload),
+    message: {
+      payload,
+      adminContact: vapidSubject,
+      options: { ttl: 86400, urgency: "high" },
+    },
+  });
+
+  return fetch(endpoint, {
+    method: "POST",
+    headers,
+    body,
   });
 }
 
