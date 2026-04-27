@@ -54,6 +54,34 @@ export function usePushSubscription() {
     navigator.serviceWorker.register("/sw-push.js").catch(console.error);
   }, [isSupported]);
 
+  // Sync state: clear delivered system notifications and reset app badge when
+  // the app gains focus or becomes visible.
+  useEffect(() => {
+    if (!isSupported) return;
+
+    const clearDelivered = () => {
+      // Reset PWA app badge if available
+      // @ts-expect-error: clearAppBadge is not in lib.dom yet on all TS versions
+      if (navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+      // Ask the service worker to close any visible notifications
+      navigator.serviceWorker?.ready
+        .then((reg) => reg.active?.postMessage({ type: "CLEAR_NOTIFICATIONS" }))
+        .catch(() => {});
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") clearDelivered();
+    };
+
+    clearDelivered();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", clearDelivered);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", clearDelivered);
+    };
+  }, [isSupported]);
+
   const subscribe = useCallback(async () => {
     if (!user || !isSupported) return false;
 
