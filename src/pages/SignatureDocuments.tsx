@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
-import { ArrowLeft, CheckCircle2, Download, ExternalLink, FileSignature, Loader2, PenSquare, Send, Trash2, Upload, RefreshCw, Plus, X, UserPlus, ZoomIn, ZoomOut, RotateCw, Eye, FolderArchive } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, ExternalLink, FileSignature, Loader2, PenSquare, Send, Trash2, Upload, RefreshCw, Plus, X, UserPlus, ZoomIn, ZoomOut, RotateCw, Eye, FolderArchive, Archive } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import FiscalDataModal from "@/components/FiscalDataModal";
 import SignatureCanvas, { type SignatureCanvasHandle } from "@/components/SignatureCanvas";
@@ -23,6 +23,10 @@ import ShareButton from "@/components/ShareButton";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -43,6 +47,9 @@ type SignatureDocument = {
   signed_at: string | null;
   created_at: string;
   is_info_only?: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  deletion_reason?: string | null;
 };
 
 type DocRecipient = {
@@ -70,7 +77,7 @@ const SignatureDocuments = () => {
   const [docRecipients, setDocRecipients] = useState<DocRecipient[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<SignatureDocument | null>(null);
-  const [activeTab, setActiveTab] = useState<"pending" | "sent" | "archive">("pending");
+  const [activeTab, setActiveTab] = useState<"pending" | "sent" | "archive" | "deleted">("pending");
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pdfPages, setPdfPages] = useState<HTMLCanvasElement[]>([]);
   const [previewZoom, setPreviewZoom] = useState(100);
@@ -82,6 +89,8 @@ const SignatureDocuments = () => {
   const [file, setFile] = useState<File | null>(null);
   const [isInfoOnly, setIsInfoOnly] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SignatureDocument | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [replaceTarget, setReplaceTarget] = useState<SignatureDocument | null>(null);
   const [replaceFile, setReplaceFile] = useState<File | null>(null);
   
@@ -111,7 +120,8 @@ const SignatureDocuments = () => {
       if (extraDocIds.length > 0) {
         const { data: extraDocs } = await (supabase.from("signature_documents" as any) as any)
           .select("*")
-          .in("id", extraDocIds);
+          .in("id", extraDocIds)
+          .eq("project_id", projectId);
         if (extraDocs) data?.push(...extraDocs);
       }
     }
@@ -256,23 +266,36 @@ const SignatureDocuments = () => {
 
   // Documents needing signature action
   const pendingDocuments = useMemo(
-    () => documents.filter((d) => !d.is_info_only && userNeedsToSign(d)),
+    () => documents.filter((d) => !d.deleted_at && !d.is_info_only && userNeedsToSign(d)),
     [documents, user?.id, docRecipients],
   );
 
   // Sent + completed (non-info-only)
   const sentAndCompletedDocuments = useMemo(
-    () => documents.filter((d) => !d.is_info_only && (d.sender_id === user?.id || d.status === "signed" || (!userNeedsToSign(d) && d.recipient_id !== user?.id))),
+    () => documents.filter((d) => !d.deleted_at && !d.is_info_only && (d.sender_id === user?.id || d.status === "signed" || (!userNeedsToSign(d) && d.recipient_id !== user?.id))),
     [documents, user?.id, docRecipients],
   );
 
   // Archive / Mi Carpeta — info-only documents
   const archiveDocuments = useMemo(
-    () => documents.filter((d) => d.is_info_only),
+    () => documents.filter((d) => !d.deleted_at && d.is_info_only),
     [documents],
   );
 
-  const activeDocuments = activeTab === "pending" ? pendingDocuments : activeTab === "sent" ? sentAndCompletedDocuments : archiveDocuments;
+  // Eliminados — registro inmutable de documentos borrados (todos los del proyecto)
+  const deletedDocuments = useMemo(
+    () => documents.filter((d) => !!d.deleted_at).sort((a, b) => (b.deleted_at || "").localeCompare(a.deleted_at || "")),
+    [documents],
+  );
+
+  const activeDocuments =
+    activeTab === "pending" ? pendingDocuments
+    : activeTab === "sent" ? sentAndCompletedDocuments
+    : activeTab === "archive" ? archiveDocuments
+    : deletedDocuments;
+
+  // DO/DEM pueden borrar cualquier documento del proyecto
+  const isProjectAdmin = projectRole === "DO" || projectRole === "DEM";
 
   // Multi-recipient helpers
   const addRecipient = () => {
@@ -351,34 +374,42 @@ const SignatureDocuments = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget || !user) return;
+    const reason = deleteReason.trim();
+    if (reason.length < 5) { toast.error("Indica el motivo de la eliminación (mínimo 5 caracteres)"); return; }
+    setDeleting(true);
     try {
-      // 1. Delete all recipient rows first (FK constraint)
-      const { error: recErr } = await (supabase.from("signature_document_recipients" as any) as any)
-        .delete()
-        .eq("document_id", deleteTarget.id);
-      if (recErr) console.warn("Error deleting recipients:", recErr);
-      // 2. Remove file from storage
-      await supabase.storage.from("plans").remove([deleteTarget.original_file_path]);
-      if (deleteTarget.signed_file_path) {
-        await supabase.storage.from("plans").remove([deleteTarget.signed_file_path]);
-      }
-      // 3. Delete the document record
-      const { error: docErr } = await (supabase.from("signature_documents" as any) as any)
-        .delete()
-        .eq("id", deleteTarget.id)
-        .eq("sender_id", user.id);
-      if (docErr) throw docErr;
+      // Soft-delete: preservamos el registro y los archivos para trazabilidad legal.
+      const { error: updErr } = await (supabase.from("signature_documents" as any) as any)
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: user.id,
+          deletion_reason: reason,
+        })
+        .eq("id", deleteTarget.id);
+      if (updErr) throw updErr;
       await supabase.from("audit_logs").insert({
         user_id: user.id, project_id: projectId,
-        action: "signature_document_deleted", details: { document_id: deleteTarget.id, title: deleteTarget.title },
+        action: "signature_document_deleted",
+        details: {
+          document_id: deleteTarget.id,
+          title: deleteTarget.title,
+          reason,
+          deleted_by_role: projectRole || "N/A",
+        },
       });
-      toast.success("Documento eliminado completamente");
+      toast.success("Documento movido a Eliminados");
       if (selectedDocument?.id === deleteTarget.id) setSelectedDocument(null);
-      // Remove from local state immediately
-      setDocuments(prev => prev.filter(d => d.id !== deleteTarget.id));
-      setDocRecipients(prev => prev.filter(r => r.document_id !== deleteTarget.id));
+      // Marcar como eliminado en estado local inmediatamente
+      setDocuments(prev => prev.map(d => d.id === deleteTarget.id
+        ? { ...d, deleted_at: new Date().toISOString(), deleted_by: user.id, deletion_reason: reason }
+        : d));
       setDeleteTarget(null);
-    } catch (err: any) { toast.error(err?.message || "Error al eliminar"); }
+      setDeleteReason("");
+    } catch (err: any) {
+      toast.error(err?.message || "Error al eliminar");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleReplace = async () => {
