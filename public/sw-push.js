@@ -1,7 +1,7 @@
 /* Service Worker for Web Push Notifications */
-/* v2 – cache-bust old PWA icons */
+/* v3 – persistent, role-aware, deep-linked notifications */
 
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -15,6 +15,16 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+/* Role visual dictionary — kept in sync with the client. */
+const ROLE_META = {
+  CON:      { prefix: "[CONSTRUCTOR]", vibrate: [120, 60, 120] },
+  DO:       { prefix: "[DO]",          vibrate: [120, 60, 120] },
+  DEM:      { prefix: "[DEM]",         vibrate: [120, 60, 120] },
+  CSS:      { prefix: "[CSS]",         vibrate: [200, 100, 200, 100, 200] },
+  PRO:      { prefix: "[PROMOTOR]",    vibrate: [120, 60, 120] },
+  PROMOTOR: { prefix: "[PROMOTOR]",    vibrate: [120, 60, 120] },
+};
+
 self.addEventListener("push", (event) => {
   let data = { title: "TEKTRA", body: "Nueva notificación", url: "/" };
   try {
@@ -23,13 +33,40 @@ self.addEventListener("push", (event) => {
     // fallback
   }
 
+  const role = (data.senderRole || "").toUpperCase();
+  const meta = ROLE_META[role];
+  const senderName = data.senderName || "";
+  const rawBody = data.body || data.message || "Nueva notificación";
+
+  // Body format: "[ROL] Nombre: contenido"
+  let body = rawBody;
+  if (senderName && !rawBody.startsWith(senderName)) {
+    body = `${senderName}: ${rawBody}`;
+  }
+  if (meta && !body.startsWith(meta.prefix)) {
+    body = `${meta.prefix} ${body}`;
+  }
+
+  // Tag groups notifications by project (or message id as fallback)
+  const tag = data.projectId
+    ? `tektra-project-${data.projectId}`
+    : data.id || "tektra-notification";
+
   event.waitUntil(
     self.registration.showNotification(data.title || "TEKTRA", {
-      body: data.body || data.message || "Nueva notificación",
+      body,
       icon: "/tektra-icon-192.png",
       badge: "/tektra-icon-192.png",
-      tag: data.id || "tektra-notification",
-      data: { url: data.url || "/" },
+      tag,
+      renotify: true,
+      requireInteraction: true,
+      vibrate: meta?.vibrate || [120, 60, 120],
+      timestamp: Date.now(),
+      data: {
+        url: data.url || "/",
+        projectId: data.projectId || null,
+        notificationId: data.id || null,
+      },
     })
   );
 });
@@ -50,4 +87,15 @@ self.addEventListener("notificationclick", (event) => {
       return clients.openWindow(fullUrl);
     })
   );
+});
+
+/* Allow the app to ask the SW to clear delivered notifications when it gains focus. */
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "CLEAR_NOTIFICATIONS") {
+    event.waitUntil(
+      self.registration.getNotifications().then((notifs) => {
+        notifs.forEach((n) => n.close());
+      })
+    );
+  }
 });
