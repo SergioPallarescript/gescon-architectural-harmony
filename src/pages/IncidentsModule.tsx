@@ -189,6 +189,7 @@ const IncidentsModule = () => {
       signed_by: user.id,
       is_locked: true,
       signature_image: signatureImage,
+      recipient_user_id: findRecipientUserId(dirigidaA),
     } as any);
 
     if (error) { toast.error("Error al registrar incidencia"); setSubmitting(false); return; }
@@ -198,6 +199,19 @@ const IncidentsModule = () => {
       action: "incident_created_legal",
       details: { severity, asunto, dirigida_a: dirigidaA, signature_type: signatureMethod, hash, geo },
     });
+
+    // Notify specific recipient about pending counter-signature
+    const recipientUserId = findRecipientUserId(dirigidaA);
+    if (recipientUserId) {
+      await notifyUser({
+        userId: recipientUserId,
+        projectId,
+        title: "🛡️ Incidencia pendiente de firma",
+        message: `Tienes una incidencia (${severity}) dirigida a ti pendiente de firmar: "${asunto}"`,
+        type: "signature",
+        actorId: user.id,
+      });
+    }
 
     await notifyProjectMembers({
       projectId, actorId: user.id,
@@ -234,9 +248,29 @@ const IncidentsModule = () => {
       dirigida_a: dirigidaA, escrita_por: escritaPor, asunto: asunto.trim(),
       signature_hash: hash, signature_geo: geo, signature_type: "p12",
       signed_at: new Date().toISOString(), signed_by: user.id, is_locked: true,
+      recipient_user_id: findRecipientUserId(dirigidaA),
     } as any);
 
     if (error) { toast.error("Error al registrar incidencia"); setSubmitting(false); return; }
+
+    // Notify specific recipient + all members
+    const recipientUserId = findRecipientUserId(dirigidaA);
+    if (recipientUserId) {
+      await notifyUser({
+        userId: recipientUserId,
+        projectId,
+        title: "🛡️ Incidencia pendiente de firma",
+        message: `Tienes una incidencia (${severity}) dirigida a ti pendiente de firmar: "${asunto}"`,
+        type: "signature",
+        actorId: user.id,
+      });
+    }
+    await notifyProjectMembers({
+      projectId, actorId: user.id,
+      title: "Nueva incidencia registrada",
+      message: `Incidencia (${severity}) firmada con certificado digital: ${asunto}`,
+      type: severity === "critical" || severity === "high" ? "warning" : "info",
+    });
 
     toast.success("Incidencia registrada con certificado digital");
     resetForm(); setCreateOpen(false); setSubmitting(false); fetchIncidents();
