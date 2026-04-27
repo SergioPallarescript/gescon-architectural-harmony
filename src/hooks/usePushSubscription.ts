@@ -38,6 +38,41 @@ export function usePushSubscription() {
     }
   }, []);
 
+  // Keep `permission` in sync if the user toggles it from the OS / browser
+  // settings while the app is open. Uses the Permissions API where available
+  // and falls back to refreshing on focus / visibility changes.
+  useEffect(() => {
+    if (!isSupported) return;
+
+    const refresh = () => setPermission(Notification.permission);
+
+    let permStatus: PermissionStatus | undefined;
+    const nav = navigator as Navigator & {
+      permissions?: { query: (d: { name: PermissionName }) => Promise<PermissionStatus> };
+    };
+    if (nav.permissions?.query) {
+      nav.permissions
+        .query({ name: "notifications" as PermissionName })
+        .then((status) => {
+          permStatus = status;
+          status.onchange = refresh;
+          refresh();
+        })
+        .catch(() => {});
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", refresh);
+    return () => {
+      if (permStatus) permStatus.onchange = null;
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [isSupported]);
+
   // Register SW on mount
   useEffect(() => {
     if (!isSupported) return;
