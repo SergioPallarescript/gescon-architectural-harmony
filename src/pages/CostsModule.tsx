@@ -23,7 +23,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { notifyProjectMembers, pushCostSubmission } from "@/lib/notifications";
+import { notifyProjectMembers, notifyProjectMembersByRole, notifyUser, pushCostSubmission } from "@/lib/notifications";
 import ShareButton from "@/components/ShareButton";
 import {
   ArrowLeft, Plus, DollarSign, CheckCircle2, XCircle, Download, ExternalLink,
@@ -291,15 +291,33 @@ const CostsModule = () => {
 
     const docLabel = DOC_TYPE_LABELS[docType] || docType;
     toast.success(`${docLabel} enviado${autoValidate ? " y validado automáticamente" : ""}`);
-    await notifyProjectMembers({
-      projectId: projectId!,
-      actorId: user.id,
-      title: autoValidate ? `${docLabel} validada por DF: ${title}` : `Nueva ${docLabel}: ${title}`,
-      message: autoValidate
-        ? `"${title}" ha sido creada y validada automáticamente por la Dirección Facultativa. Pendiente de autorización de pago por el Promotor.`
-        : `Se ha registrado ${docLabel === "Certificación" ? "una nueva Certificación" : docLabel === "Partida" ? "una nueva Partida" : "un nuevo Presupuesto"} pendiente de validación: "${title}"`,
-      type: "cost",
-    });
+    if (autoValidate) {
+      // Auto-validated by DO/DEM: notify PRO to authorize payment
+      await notifyProjectMembersByRole({
+        projectId: projectId!,
+        actorId: user.id,
+        roles: ["PRO"],
+        title: `💰 Validación Económica — Autoriza Pago: ${docLabel}`,
+        message: `"${title}" ha sido validada por la Dirección Facultativa. Requiere tu autorización de pago.`,
+        type: "cost",
+      });
+    } else {
+      // Pending technical validation: notify DO + DEM
+      const techTitle = docType === "certificacion"
+        ? `✍️ Certificación pendiente de firma: ${title}`
+        : `📋 ${docLabel} pendiente de validación: ${title}`;
+      const techMessage = docType === "certificacion"
+        ? `Se requiere tu firma con certificado digital para validar la Certificación "${title}". (DO + DEM)`
+        : `Se requiere tu validación para ${docLabel === "Partida" ? "la Partida" : "el Presupuesto"} "${title}".`;
+      await notifyProjectMembersByRole({
+        projectId: projectId!,
+        actorId: user.id,
+        roles: ["DO", "DEM"],
+        title: techTitle,
+        message: techMessage,
+        type: "cost",
+      });
+    }
 
     // Reset form
     setTitle(""); setDescription(""); setAmount(""); setFile(null); setDocType("certificacion");
@@ -320,11 +338,13 @@ const CostsModule = () => {
       toast.success("Validación técnica registrada");
       const { data: claim } = await supabase.from("cost_claims").select("title, doc_type").eq("id", id).single();
       const dt = DOC_TYPE_LABELS[claim?.doc_type || "certificacion"];
-      await notifyProjectMembers({
+      // Notify PRO specifically: payment authorization required
+      await notifyProjectMembersByRole({
         projectId: projectId!,
         actorId: user.id,
-        title: `${dt} validada técnicamente`,
-        message: `"${claim?.title || ""}" ha sido validada. Pendiente de autorización de pago por el Promotor.`,
+        roles: ["PRO"],
+        title: `💰 Autoriza Pago: ${dt}`,
+        message: `"${claim?.title || ""}" ha sido validada técnicamente. Requiere tu autorización de pago.`,
         type: "cost",
       });
     } else if (action === "authorize_payment") {
@@ -333,8 +353,18 @@ const CostsModule = () => {
         payment_authorized_at: new Date().toISOString(),
       }).eq("id", id);
       toast.success("Pago autorizado");
-      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type").eq("id", id).single();
+      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type, submitted_by").eq("id", id).single();
       const dt = DOC_TYPE_LABELS[claim?.doc_type || "certificacion"];
+      if (claim?.submitted_by) {
+        await notifyUser({
+          userId: claim.submitted_by,
+          projectId: projectId!,
+          title: `✅ Pago autorizado: ${dt}`,
+          message: `"${claim?.title || ""}" ha sido autorizada para pago.`,
+          type: "cost",
+          actorId: user.id,
+        });
+      }
       await notifyProjectMembers({
         projectId: projectId!,
         actorId: user.id,
@@ -350,14 +380,17 @@ const CostsModule = () => {
       toast.success("Documento rechazado");
       const { data: claim } = await supabase.from("cost_claims").select("title, doc_type, submitted_by").eq("id", id).single();
       const dt = DOC_TYPE_LABELS[claim?.doc_type || "certificacion"];
-      // Notify submitter urgently if PRO rejects
-      await notifyProjectMembers({
-        projectId: projectId!,
-        actorId: user.id,
-        title: `⚠️ ${dt} rechazada`,
-        message: `"${claim?.title || ""}" ha sido rechazada.${rejectReason ? ` Motivo: ${rejectReason}` : ""}`,
-        type: "cost",
-      });
+      // Notify submitter urgently
+      if (claim?.submitted_by) {
+        await notifyUser({
+          userId: claim.submitted_by,
+          projectId: projectId!,
+          title: `⚠️ ${dt} rechazada`,
+          message: `"${claim?.title || ""}" ha sido rechazada.${rejectReason ? ` Motivo: ${rejectReason}` : ""}`,
+          type: "cost",
+          actorId: user.id,
+        });
+      }
     }
     setActionClaim(null); setRejectReason(""); fetchClaims();
     if (selectedClaim?.id === id) {
@@ -476,6 +509,18 @@ const CostsModule = () => {
 
       signatureRef.current.clear();
       toast.success("Documento firmado");
+      // If technical validation is now complete, notify PRO
+      if (updates.status === "pending_payment") {
+        const dtLabel = DOC_TYPE_LABELS[(selectedClaim as any).doc_type || "certificacion"];
+        await notifyProjectMembersByRole({
+          projectId: projectId!,
+          actorId: user.id,
+          roles: ["PRO"],
+          title: `💰 Autoriza Pago: ${dtLabel}`,
+          message: `"${selectedClaim.title}" ha sido validada técnicamente. Requiere tu autorización de pago.`,
+          type: "cost",
+        });
+      }
       await fetchClaims();
       const { data: refreshed } = await supabase.from("cost_claims").select("*").eq("id", selectedClaim.id).single();
       if (refreshed) setSelectedClaim(refreshed);
@@ -526,6 +571,17 @@ const CostsModule = () => {
     });
 
     toast.success("Documento firmado con certificado digital");
+    if (updates.status === "pending_payment") {
+      const dtLabel = DOC_TYPE_LABELS[dt];
+      await notifyProjectMembersByRole({
+        projectId: projectId!,
+        actorId: user.id,
+        roles: ["PRO"],
+        title: `💰 Autoriza Pago: ${dtLabel}`,
+        message: `"${selectedClaim.title}" ha sido validada técnicamente con certificado digital. Requiere tu autorización de pago.`,
+        type: "cost",
+      });
+    }
     await fetchClaims();
     const { data: refreshed } = await supabase.from("cost_claims").select("*").eq("id", selectedClaim.id).single();
     if (refreshed) setSelectedClaim(refreshed);
