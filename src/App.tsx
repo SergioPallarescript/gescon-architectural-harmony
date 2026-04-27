@@ -10,6 +10,7 @@ import LegalGateModal from "@/components/LegalGateModal";
 import PushPermissionModal from "@/components/PushPermissionModal";
 import TektraSplash from "@/components/TektraSplash";
 import TektraLoader from "@/components/TektraLoader";
+import { saveIntendedRoute } from "@/lib/authRedirect";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -60,7 +61,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!session) return <Navigate to="/auth" replace />;
+  if (!session) {
+    // Persist the route the user was trying to reach (e.g. a deep link from
+    // a push notification) so we can navigate them there after login.
+    if (typeof window !== "undefined") {
+      saveIntendedRoute(window.location.pathname + window.location.search + window.location.hash);
+    }
+    return <Navigate to="/auth" replace />;
+  }
 
   if (termsAccepted === false) {
     return (
