@@ -338,11 +338,13 @@ const CostsModule = () => {
       toast.success("Validación técnica registrada");
       const { data: claim } = await supabase.from("cost_claims").select("title, doc_type").eq("id", id).single();
       const dt = DOC_TYPE_LABELS[claim?.doc_type || "certificacion"];
-      await notifyProjectMembers({
+      // Notify PRO specifically: payment authorization required
+      await notifyProjectMembersByRole({
         projectId: projectId!,
         actorId: user.id,
-        title: `${dt} validada técnicamente`,
-        message: `"${claim?.title || ""}" ha sido validada. Pendiente de autorización de pago por el Promotor.`,
+        roles: ["PRO"],
+        title: `💰 Autoriza Pago: ${dt}`,
+        message: `"${claim?.title || ""}" ha sido validada técnicamente. Requiere tu autorización de pago.`,
         type: "cost",
       });
     } else if (action === "authorize_payment") {
@@ -351,8 +353,18 @@ const CostsModule = () => {
         payment_authorized_at: new Date().toISOString(),
       }).eq("id", id);
       toast.success("Pago autorizado");
-      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type").eq("id", id).single();
+      const { data: claim } = await supabase.from("cost_claims").select("title, doc_type, submitted_by").eq("id", id).single();
       const dt = DOC_TYPE_LABELS[claim?.doc_type || "certificacion"];
+      if (claim?.submitted_by) {
+        await notifyUser({
+          userId: claim.submitted_by,
+          projectId: projectId!,
+          title: `✅ Pago autorizado: ${dt}`,
+          message: `"${claim?.title || ""}" ha sido autorizada para pago.`,
+          type: "cost",
+          actorId: user.id,
+        });
+      }
       await notifyProjectMembers({
         projectId: projectId!,
         actorId: user.id,
@@ -368,14 +380,17 @@ const CostsModule = () => {
       toast.success("Documento rechazado");
       const { data: claim } = await supabase.from("cost_claims").select("title, doc_type, submitted_by").eq("id", id).single();
       const dt = DOC_TYPE_LABELS[claim?.doc_type || "certificacion"];
-      // Notify submitter urgently if PRO rejects
-      await notifyProjectMembers({
-        projectId: projectId!,
-        actorId: user.id,
-        title: `⚠️ ${dt} rechazada`,
-        message: `"${claim?.title || ""}" ha sido rechazada.${rejectReason ? ` Motivo: ${rejectReason}` : ""}`,
-        type: "cost",
-      });
+      // Notify submitter urgently
+      if (claim?.submitted_by) {
+        await notifyUser({
+          userId: claim.submitted_by,
+          projectId: projectId!,
+          title: `⚠️ ${dt} rechazada`,
+          message: `"${claim?.title || ""}" ha sido rechazada.${rejectReason ? ` Motivo: ${rejectReason}` : ""}`,
+          type: "cost",
+          actorId: user.id,
+        });
+      }
     }
     setActionClaim(null); setRejectReason(""); fetchClaims();
     if (selectedClaim?.id === id) {
