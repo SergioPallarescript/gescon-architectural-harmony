@@ -21,7 +21,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { notifyProjectMembers } from "@/lib/notifications";
+import { notifyProjectMembers, notifyUser } from "@/lib/notifications";
 import {
   ArrowLeft, Plus, ShieldAlert, Mic, MicOff, Camera, Image, Paperclip, X, Lock, ShieldCheck, FileSignature, CheckCircle2,
 } from "lucide-react";
@@ -37,6 +37,11 @@ const severityLabels: Record<string, { label: string; color: string }> = {
 };
 
 const DESTINATARIOS = ["CONSTRUCTOR", "PROMOTOR", "DIRECCIÓN FACULTATIVA", "TODOS LOS AGENTES"];
+const DESTINATARIOS_ROLES: Record<string, string> = {
+  "CONSTRUCTOR": "CON",
+  "PROMOTOR": "PRO",
+  "DIRECCIÓN FACULTATIVA": "DO",
+};
 const EMISORES = ["COORD. SEGURIDAD Y SALUD", "DIRECCIÓN FACULTATIVA"];
 
 const IncidentsModule = () => {
