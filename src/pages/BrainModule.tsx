@@ -12,7 +12,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import ReactMarkdown from "react-markdown";
 import { syncProjectMemory } from "@/lib/projectMemory";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useVoiceDictation } from "@/hooks/useVoiceDictation";
+import { useNativeVoiceDictation as useVoiceDictation } from "@/hooks/useNativeVoiceDictation";
+import { pickImage } from "@/lib/nativeMedia";
 
 type Msg = { role: "user" | "assistant"; content: string; imageUrls?: string[] };
 type Conversation = { id: string; title: string; created_at: string };
@@ -512,10 +513,10 @@ const BrainModule = () => {
               </Button>
               {isMobile ? (
                 <>
-                  <Button type="button" variant="outline" size="icon" onClick={() => cameraInputRef.current?.click()} className="shrink-0">
+                  <Button type="button" variant="outline" size="icon" onClick={async () => { const f = await pickImage("camera", cameraInputRef.current); if (f && f.length) handleImageSelect(f as unknown as FileList); }} className="shrink-0">
                     <Camera className="h-4 w-4" />
                   </Button>
-                  <Button type="button" variant="outline" size="icon" onClick={() => galleryInputRef.current?.click()} className="shrink-0">
+                  <Button type="button" variant="outline" size="icon" onClick={async () => { const f = await pickImage("gallery", galleryInputRef.current); if (f && f.length) handleImageSelect(f as unknown as FileList); }} className="shrink-0">
                     <ImageIcon className="h-4 w-4" />
                   </Button>
                 </>
