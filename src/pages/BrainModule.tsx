@@ -513,10 +513,10 @@ const BrainModule = () => {
               </Button>
               {isMobile ? (
                 <>
-                  <Button type="button" variant="outline" size="icon" onClick={async () => { const f = await pickImage("camera", cameraInputRef.current); if (f && f.length) handleImageSelect(f as unknown as FileList); }} className="shrink-0">
+                  <Button type="button" variant="outline" size="icon" onClick={async () => { const f = await pickImage("camera", cameraInputRef.current); if (f && f.length) handleImageSelect(f); }} className="shrink-0">
                     <Camera className="h-4 w-4" />
                   </Button>
-                  <Button type="button" variant="outline" size="icon" onClick={async () => { const f = await pickImage("gallery", galleryInputRef.current); if (f && f.length) handleImageSelect(f as unknown as FileList); }} className="shrink-0">
+                  <Button type="button" variant="outline" size="icon" onClick={async () => { const f = await pickImage("gallery", galleryInputRef.current); if (f && f.length) handleImageSelect(f); }} className="shrink-0">
                     <ImageIcon className="h-4 w-4" />
                   </Button>
                 </>
