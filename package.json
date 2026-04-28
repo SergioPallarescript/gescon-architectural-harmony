@@ -13,7 +13,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^7",
     "@capacitor/app": "^8.1.0",
+    "@capacitor/camera": "^8",
     "@capacitor/core": "^8.3.1",
     "@capacitor/push-notifications": "^8.0.3",
     "@fontsource/inter": "^5.2.8",
