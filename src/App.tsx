@@ -107,6 +107,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 /** Activates native FCM/APNs registration once the user is authenticated. */
 const NativePushBridge = () => {
   useNativePush();
+  useNativeNotificationChannel();
   return null;
 };
 
