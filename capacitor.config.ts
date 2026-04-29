@@ -13,6 +13,12 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
+    LocalNotifications: {
+      // Defaults; per-channel config is done at runtime via createChannel()
+      smallIcon: 'ic_stat_icon_config_sample',
+      iconColor: '#141414',
+      sound: 'default',
+    },
   },
 };
 
