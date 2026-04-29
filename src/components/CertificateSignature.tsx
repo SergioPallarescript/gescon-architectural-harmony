@@ -160,7 +160,8 @@ export default function CertificateSignature({ disabled, userRole, onSign, origi
             setParsedCert(result);
             toast.success("Certificado reconocido automáticamente");
           } catch {
-            // Saved password no longer valid
+            // Saved password no longer valid — forget it so the user can re-enter.
+            forgetSavedPassword(file.name, file.size);
             setPassword("");
             setPasswordRemembered(false);
           }
