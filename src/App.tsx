@@ -12,6 +12,7 @@ import TektraSplash from "@/components/TektraSplash";
 import TektraLoader from "@/components/TektraLoader";
 import { saveIntendedRoute } from "@/lib/authRedirect";
 import { useNativePush } from "@/hooks/useNativePush";
+import { useNativeNotificationChannel } from "@/hooks/useNativeNotificationChannel";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import ProjectDetail from "./pages/ProjectDetail";
