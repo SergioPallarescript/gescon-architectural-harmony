@@ -387,6 +387,32 @@ const SignatureDocuments = () => {
         })
         .eq("id", deleteTarget.id);
       if (updErr) throw updErr;
+
+      // Cancelar notificaciones de firma pendientes asociadas al documento
+      // para todos sus destinatarios (principal + adicionales).
+      try {
+        const recipientIds = new Set<string>();
+        if (deleteTarget.recipient_id) recipientIds.add(deleteTarget.recipient_id);
+        const { data: extraRecips } = await (supabase.from("signature_document_recipients" as any) as any)
+          .select("recipient_id")
+          .eq("document_id", deleteTarget.id);
+        (extraRecips || []).forEach((r: any) => r?.recipient_id && recipientIds.add(r.recipient_id));
+
+        if (recipientIds.size > 0) {
+          const nowIso = new Date().toISOString();
+          await supabase
+            .from("notifications")
+            .update({ is_read: true, acknowledged_at: nowIso })
+            .in("user_id", Array.from(recipientIds))
+            .eq("project_id", projectId)
+            .eq("is_read", false)
+            .in("type", ["signature", "info"])
+            .ilike("message", `%${deleteTarget.title}%`);
+        }
+      } catch (notifErr) {
+        console.warn("No se pudieron cancelar notificaciones asociadas:", notifErr);
+      }
+
       await supabase.from("audit_logs").insert({
         user_id: user.id, project_id: projectId,
         action: "signature_document_deleted",
