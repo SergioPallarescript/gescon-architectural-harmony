@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist";
 import { supabase } from "@/integrations/supabase/client";
+import { downloadFile, openFile } from "@/lib/nativeMedia";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectRole } from "@/hooks/useProjectRole";
 import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";

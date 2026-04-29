@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { downloadFile } from "@/lib/nativeMedia";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectRole } from "@/hooks/useProjectRole";
 import AppLayout from "@/components/AppLayout";
