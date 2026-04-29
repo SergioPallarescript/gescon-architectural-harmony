@@ -656,15 +656,14 @@ const CostsModule = () => {
 
   const handleDownload = () => {
     if (!pdfBlobUrl || !selectedClaim) return;
-    const a = document.createElement("a");
-    a.href = pdfBlobUrl;
-    a.download = selectedClaim.file_name || "documento.pdf";
-    a.click();
+    downloadFile(pdfBlobUrl, selectedClaim.file_name || "documento.pdf")
+      .catch(() => toast.error("No se pudo descargar"));
   };
 
   const handleOpenExternal = () => {
     if (!pdfBlobUrl) return;
-    window.open(pdfBlobUrl, "_blank");
+    openFile(pdfBlobUrl, selectedClaim?.file_name || "documento.pdf")
+      .catch(() => toast.error("No se pudo abrir"));
   };
 
   /* ───── Action buttons per claim ───── */

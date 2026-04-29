@@ -105,9 +105,7 @@ const ProjectDocs = () => {
   const handleDownload = async (doc: any) => {
     const { data } = await supabase.storage.from("plans").download(doc.file_url);
     if (!data) return;
-    const url = URL.createObjectURL(data);
-    const a = document.createElement("a"); a.href = url; a.download = doc.file_name; a.click();
-    URL.revokeObjectURL(url);
+    await downloadFile(data, doc.file_name);
   };
 
   const formatSize = (bytes: number | null) => {

@@ -379,9 +379,7 @@ const CFOModule = () => {
   const handleDownloadItem = async (item: any) => {
     const { data } = await supabase.storage.from("plans").download(item.file_url);
     if (!data) return;
-    const url = URL.createObjectURL(data);
-    const a = document.createElement("a"); a.href = url; a.download = item.file_name; a.click();
-    URL.revokeObjectURL(url);
+    await downloadFile(data, item.file_name);
   };
 
   const handleFileUpload = async (itemId: string, file: File) => {

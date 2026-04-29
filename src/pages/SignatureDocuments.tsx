@@ -20,6 +20,7 @@ import { sanitizeFileName, uploadFileWithFallback } from "@/lib/storage";
 import { toast } from "sonner";
 import { notifyUser, pushSignatureRequest } from "@/lib/notifications";
 import ShareButton from "@/components/ShareButton";
+import { downloadFile, openFile } from "@/lib/nativeMedia";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
